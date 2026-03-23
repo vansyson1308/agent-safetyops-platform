@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  role         String   @default("viewer") // owner, admin, analyst, approver, viewer
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agents          Agent[]
+  policies        Policy[]
+  runs            Run[]
+  approvals       ApprovalRequest[]
+  auditEvents     AuditEvent[]
+  incidentReports IncidentReport[]
+  browserSessions BrowserSession[]
+  apiKeys         ApiKey[]
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Agent {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  provider      String   // Gemini, OpenAI, Anthropic, Custom
+  capabilities  String   // JSON array of strings
+  trustLevel    String   @default("medium") // low, medium, high
+  maxTokenBudget Int?
+  actionBudget  Int?
+  approvalMode  Boolean  @default(true)
+  status        String   @default("active") // active, inactive, archived
+  
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  runs          Run[]
+  policies      Policy[]
+  browserSessions BrowserSession[]
+  apiKeys       ApiKey[]
+}
+
+model Policy {
+  id                 String   @id @default(uuid())
+  name               String
+  description        String?
+  scope              String   @default("global") // global, agent
+  allowedTools       String   // JSON array
+  blockedTools       String   // JSON array
+  blockedDomains     String   // JSON array
+  allowedDomains     String   // JSON array
+  restrictedActions  String   // JSON array
+  maxSpend           Float?
+  maxStepsPerRun     Int?
+  severityThreshold  Int      @default(50) // 0-100
+  
+  agentId            String?
+  agent              Agent?   @relation(fields: [agentId], references: [id])
+  
+  createdById        String
+  createdBy          User     @relation(fields: [createdById], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  rules              PolicyRule[]
+}
+
+model PolicyRule {
+  id          String   @id @default(uuid())
+  policyId    String
+  policy      Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  condition   String   // JSON object describing the condition
+  action      String   // allow, block, require_approval
+  severity    Int      @default(0) // 0-100
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Run {
+  id            String   @id @default(uuid())
+  task          String
+  status        String   @default("running") // running, completed, failed, paused, blocked
+  riskScore     Int?     // 0-100
+  confidence    Int?     // 0-100
+  summary       String?
+  
+  agentId       String
+  agent         Agent    @relation(fields: [agentId], references: [id])
+  
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  steps         RunStep[]
+  approvals     ApprovalRequest[]
+  incidents     IncidentReport[]
+}
+
+model RunStep {
+  id            String   @id @default(uuid())
+  runId         String
+  run           Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sequence      Int
+  actionType    String   // tool_call, reasoning, observation
+  actionName    String?
+  actionInput   String?  // JSON
+  actionOutput  String?  // JSON
+  classification String  @default("safe") // safe, warning, blocked, requires_approval
+  riskScore     Int?
+  policyViolations String? // JSON array of policy IDs
+  
+  createdAt     DateTime @default(now())
+}
+
+model ApprovalRequest {
+  id            String   @id @default(uuid())
+  runId         String
+  run           Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stepId        String?  // Optional, if tied to a specific step
+  status        String   @default("pending") // pending, approved, denied, modified
+  reason        String
+  proposedAction String  // JSON
+  
+  approverId    String?
+  approver      User?    @relation(fields: [approverId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AuditEvent {
+  id            String   @id @default(uuid())
+  eventType     String   // agent_created, policy_changed, run_started, step_blocked, approval_granted
+  resourceType  String
+  resourceId    String
+  details       String   // JSON
+  
+  actorId       String
+  actor         User     @relation(fields: [actorId], references: [id])
+  
+  createdAt     DateTime @default(now())
+}
+
+model IncidentReport {
+  id            String   @id @default(uuid())
+  runId         String
+  run           Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String
+  severity      String   // low, medium, high, critical
+  remediation   String?
+  
+  reporterId    String
+  reporter      User     @relation(fields: [reporterId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BrowserSession {
+  id            String   @id @default(uuid())
+  url           String
+  status        String   @default("active") // active, completed, failed, blocked
+  riskScore     Int?
+  summary       String?
+  
+  agentId       String?
+  agent         Agent?   @relation(fields: [agentId], references: [id])
+  
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  actions       BrowserAction[]
+  artifacts     BrowserArtifact[]
+}
+
+model BrowserAction {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       BrowserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sequence      Int
+  actionType    String   // navigate, click, type, extract_text, screenshot
+  target        String?  // CSS selector, URL, etc.
+  value         String?  // Text typed, etc.
+  
+  classification String  @default("safe") // safe, warning, blocked, requires_approval
+  riskScore     Int?
+  policyViolations String? // JSON array of policy IDs
+  explanation   String?  // Gemini-powered risk explanation
+  
+  createdAt     DateTime @default(now())
+}
+
+model BrowserArtifact {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       BrowserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  artifactType  String   // screenshot, extracted_text, downloaded_file
+  metadata      String   // JSON (e.g., coordinates, text content, file path)
+  storagePath   String?  // Path or URL to the artifact
+
+  createdAt     DateTime @default(now())
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  keyHash     String    @unique
+  prefix      String    // First 8 chars for display: "sk-abc123..."
+  agentId     String?
+  agent       Agent?    @relation(fields: [agentId], references: [id])
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Webhook {
+  id        String   @id @default(uuid())
+  url       String
+  events    String   // JSON array of event types
+  secret    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

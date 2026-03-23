@@ -1,0 +1,149 @@
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { z } from 'zod';
+import { writeAuditEvent } from '../services/auditService.ts';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+// List all agents
+router.get('/', async (req, res) => {
+  try {
+    const agents = await prisma.agent.findMany({
+      include: { createdBy: { select: { name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(agents);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch agents' });
+  }
+});
+
+// Get single agent
+router.get('/:id', async (req, res) => {
+  try {
+    const agent = await prisma.agent.findUnique({
+      where: { id: req.params.id },
+      include: {
+        createdBy: { select: { name: true, email: true } },
+        runs: { take: 10, orderBy: { createdAt: 'desc' } },
+        policies: true,
+      },
+    });
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    res.json(agent);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch agent' });
+  }
+});
+
+const createAgentSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  provider: z.enum(['Gemini', 'OpenAI', 'Anthropic', 'Custom']),
+  capabilities: z.array(z.string()).default([]),
+  trustLevel: z.enum(['low', 'medium', 'high']).default('medium'),
+  maxTokenBudget: z.number().int().positive().optional(),
+  actionBudget: z.number().int().positive().optional(),
+  approvalMode: z.boolean().default(true),
+});
+
+// Create agent
+router.post('/', async (req, res) => {
+  try {
+    const parsed = createAgentSchema.parse(req.body);
+    const agent = await prisma.agent.create({
+      data: {
+        name: parsed.name,
+        description: parsed.description,
+        provider: parsed.provider,
+        capabilities: JSON.stringify(parsed.capabilities),
+        trustLevel: parsed.trustLevel,
+        maxTokenBudget: parsed.maxTokenBudget,
+        actionBudget: parsed.actionBudget,
+        approvalMode: parsed.approvalMode,
+        createdById: req.user!.id,
+      },
+    });
+
+    await writeAuditEvent({
+      eventType: 'agent_created',
+      resourceType: 'agent',
+      resourceId: agent.id,
+      actorId: req.user!.id,
+      details: { name: parsed.name, provider: parsed.provider },
+    });
+
+    res.status(201).json(agent);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
+    res.status(500).json({ error: 'Failed to create agent' });
+  }
+});
+
+const updateAgentSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().optional(),
+  provider: z.enum(['Gemini', 'OpenAI', 'Anthropic', 'Custom']).optional(),
+  capabilities: z.array(z.string()).optional(),
+  trustLevel: z.enum(['low', 'medium', 'high']).optional(),
+  maxTokenBudget: z.number().int().positive().nullable().optional(),
+  actionBudget: z.number().int().positive().nullable().optional(),
+  approvalMode: z.boolean().optional(),
+  status: z.enum(['active', 'inactive', 'archived']).optional(),
+});
+
+// Update agent
+router.put('/:id', async (req, res) => {
+  try {
+    const parsed = updateAgentSchema.parse(req.body);
+    const data: Record<string, unknown> = { ...parsed };
+    if (parsed.capabilities) {
+      data.capabilities = JSON.stringify(parsed.capabilities);
+    }
+    const agent = await prisma.agent.update({
+      where: { id: req.params.id },
+      data: data as any,
+    });
+
+    await writeAuditEvent({
+      eventType: 'agent_updated',
+      resourceType: 'agent',
+      resourceId: agent.id,
+      actorId: req.user!.id,
+      details: parsed,
+    });
+
+    res.json(agent);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
+    res.status(500).json({ error: 'Failed to update agent' });
+  }
+});
+
+// Delete agent (soft delete)
+router.delete('/:id', async (req, res) => {
+  try {
+    const agent = await prisma.agent.update({
+      where: { id: req.params.id },
+      data: { status: 'archived' },
+    });
+
+    await writeAuditEvent({
+      eventType: 'agent_deleted',
+      resourceType: 'agent',
+      resourceId: agent.id,
+      actorId: req.user!.id,
+    });
+
+    res.json({ message: 'Agent archived successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete agent' });
+  }
+});
+
+export default router;

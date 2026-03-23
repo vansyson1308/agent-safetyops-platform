@@ -1,0 +1,182 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
+  <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg" alt="Node" />
+  <img src="https://img.shields.io/badge/typescript-5.8-blue.svg" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" />
+</p>
+
+# Agent SafetyOps Platform
+
+**Open-source AI Agent Safety, Governance & Observability Platform**
+
+SafetyOps provides enterprise-grade safety controls for AI agent deployments. It monitors agent actions in real-time, enforces security policies, manages human-in-the-loop approval workflows, and provides a complete audit trail for compliance.
+
+## Why SafetyOps?
+
+As AI agents become more autonomous, organizations need guardrails:
+
+- **Policy Enforcement** - Define rules for what agents can and cannot do (blocked tools, domain restrictions, spend limits)
+- **Approval Workflows** - High-risk actions are automatically flagged and require human approval before proceeding
+- **Risk Scoring** - AI-powered risk assessment (Google Gemini) analyzes every action for potential security threats
+- **Browser Sandboxing** - Monitor and control agent browser automation with per-action risk classification
+- **Complete Audit Trail** - Every action, decision, and approval is logged for regulatory compliance
+- **SDK Integration** - TypeScript SDK lets any AI agent framework integrate with SafetyOps in minutes
+
+## Quick Start
+
+```bash
+# Clone and install
+git clone https://github.com/vansyson1308/agent-safetyops-platform.git
+cd agent-safetyops-platform
+npm install
+
+# Set up database
+npx prisma generate
+npx prisma db push
+npm run seed
+
+# Start development server
+npm run dev
+```
+
+Open `http://localhost:3000` - you'll see a dashboard with pre-seeded demo data.
+
+## Architecture
+
+```
+Frontend (React 19 + Vite)          Backend (Express.js)
+  Dashboard                           /api/agents      - Agent CRUD
+  Agents Management                   /api/policies    - Policy CRUD
+  Security Policies                   /api/runs        - Execution monitoring
+  Execution Runs                      /api/approvals   - Approval workflow
+  Browser Sandbox                     /api/incidents   - Incident management
+  Approval Gates                      /api/audit-events - Audit trail
+  Incident Reports                    /api/v1/sdk/*    - SDK API endpoints
+  Audit Log                           /api/auth        - JWT authentication
+  Settings
+```
+
+**Tech Stack:**
+- **Frontend**: React 19, React Router v7, Tailwind CSS v4, React Query, Recharts, Shadcn/UI
+- **Backend**: Express.js, Prisma ORM (SQLite/PostgreSQL), Zod validation
+- **AI**: Google Gemini API for risk scoring and policy explanations
+- **Auth**: JWT + API Key authentication
+- **Language**: TypeScript throughout
+
+## SDK Integration
+
+SafetyOps provides a REST API that any AI agent framework can integrate with:
+
+```typescript
+// 1. Start a run
+const run = await fetch('/api/v1/sdk/runs', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer sk-your-api-key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ task: 'Process refund for order #12345', agentId: 'agent-uuid' })
+});
+
+// 2. Report each action step
+const decision = await fetch(`/api/v1/sdk/runs/${runId}/steps`, {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer sk-your-api-key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    actionType: 'tool_call',
+    actionName: 'issue_refund',
+    actionInput: { userId: '12345', amount: 120 }
+  })
+});
+
+// 3. Check if blocked (agent polls this)
+const status = await fetch(`/api/v1/sdk/runs/${runId}/decision`, {
+  headers: { 'Authorization': 'Bearer sk-your-api-key' }
+});
+// { blocked: true, pendingApprovals: 1, status: 'blocked' }
+```
+
+## Key Features
+
+### Policy Engine
+Define deterministic security rules that are evaluated before every agent action:
+- **Blocked Tools** - Prevent agents from using dangerous tools (e.g., `wire_transfer`, `delete_account`)
+- **Domain Restrictions** - Block access to unauthorized domains
+- **Spend Limits** - Cap financial transactions per run
+- **Step Limits** - Prevent infinite loops
+- **Custom Rules** - JSON-based condition matching with configurable severity
+
+### Approval Workflow
+When a policy violation is detected:
+1. The agent's run is automatically paused/blocked
+2. An approval request is created with full context
+3. A human reviewer can approve or deny the action
+4. The run resumes or fails based on the decision
+
+### Browser Sandboxing
+Monitor AI agents performing browser automation:
+- Per-action risk assessment using Gemini AI
+- Credential entry detection and blocking
+- Session replay with action timeline
+- Artifact capture (screenshots, extracted text)
+
+## Deployment
+
+### Docker
+```bash
+docker build -t safetyops .
+docker run -p 3000:3000 -e GEMINI_API_KEY=your_key safetyops
+```
+
+### Docker Compose
+```bash
+docker-compose up
+```
+
+### Google Cloud Run
+```bash
+gcloud builds submit --tag gcr.io/YOUR_PROJECT/safetyops
+gcloud run deploy safetyops --image gcr.io/YOUR_PROJECT/safetyops --set-env-vars="GEMINI_API_KEY=your_key"
+```
+
+### PostgreSQL (Production)
+Update `prisma/schema.prisma`:
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+Then run `npx prisma migrate dev --name init`.
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | No | Database URL (defaults to SQLite) |
+| `GEMINI_API_KEY` | No | Google Gemini API key for AI risk scoring |
+| `JWT_SECRET` | No | Secret for JWT tokens (auto-generated in dev) |
+| `PORT` | No | Server port (default: 3000) |
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST/PUT/DELETE | `/api/agents` | Agent CRUD |
+| GET/POST/PUT/DELETE | `/api/policies` | Policy CRUD |
+| GET/POST/PATCH | `/api/runs` | Execution runs |
+| POST | `/api/runs/:id/analyze` | AI risk analysis |
+| GET/PATCH | `/api/approvals` | Approval workflow |
+| GET/POST/PATCH | `/api/incidents` | Incident management |
+| GET/POST | `/api/browser-sessions` | Browser sandbox |
+| GET | `/api/audit-events` | Audit trail |
+| POST | `/api/auth/login` | JWT login |
+| POST | `/api/auth/register` | User registration |
+| POST | `/api/v1/sdk/runs` | SDK: Start run |
+| POST | `/api/v1/sdk/runs/:id/steps` | SDK: Report step |
+| GET | `/api/v1/sdk/runs/:id/decision` | SDK: Check decision |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+## License
+
+MIT - see [LICENSE](LICENSE) for details.

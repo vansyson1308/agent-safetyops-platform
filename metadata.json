@@ -1,0 +1,5 @@
+{
+  "name": "Agent SafetyOps Platform",
+  "description": "A security, governance, and observability platform for AI agents.",
+  "requestFramePermissions": []
+}
