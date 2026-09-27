@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ const updateApprovalSchema = z.object({
 });
 
 // Approve or deny
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('approve'), async (req, res) => {
   try {
     const parsed = updateApprovalSchema.parse(req.body);
 

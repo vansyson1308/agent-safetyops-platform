@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { explainBrowserActionRisk } from '../services/geminiService.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ const createSessionSchema = z.object({
 });
 
 // Create session
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('operate'), async (req, res) => {
   try {
     const parsed = createSessionSchema.parse(req.body);
     const session = await prisma.browserSession.create({
@@ -80,7 +81,7 @@ const browserActionSchema = z.object({
 });
 
 // Execute browser action
-router.post('/action', async (req, res) => {
+router.post('/action', requirePermission('operate'), async (req, res) => {
   try {
     const parsed = browserActionSchema.parse(req.body);
     const session = await prisma.browserSession.findUnique({

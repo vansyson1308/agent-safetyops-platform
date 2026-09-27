@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Policy } from "@/types"
+import { api } from "@/lib/api"
 
 interface PolicyDialogProps {
   open: boolean;
@@ -57,11 +58,9 @@ export default function PolicyDialog({ open, onOpenChange, policy }: PolicyDialo
         maxStepsPerRun: maxStepsPerRun ? parseInt(maxStepsPerRun) : undefined,
         severityThreshold: parseInt(severityThreshold),
       };
-      const url = isEdit ? `/api/policies/${policy.id}` : "/api/policies";
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error("Failed to save policy");
-      return res.json();
+      return isEdit
+        ? api(`/policies/${policy.id}`, { method: "PUT", body })
+        : api("/policies", { method: "POST", body });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["policies"] });

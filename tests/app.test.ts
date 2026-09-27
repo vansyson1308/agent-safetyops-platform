@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { request, startServer, type TestServer } from './helpers.ts';
+import { createUser, request, resetDb, startServer, type TestServer } from './helpers.ts';
 
 let server: TestServer;
 beforeAll(async () => { server = await startServer(); });
@@ -12,9 +12,14 @@ describe('app', () => {
     expect(res.body.status).toBe('ok');
   });
 
-  it('returns JSON 404 for unknown API routes', async () => {
-    const res = await request(server.url, 'GET', '/health/nope/nope');
+  it('requires auth for unknown API routes, then returns a JSON 404', async () => {
+    expect((await request(server.url, 'GET', '/nope')).status).toBe(401);
+
+    await resetDb();
+    const { token } = await createUser('viewer');
+    const res = await request(server.url, 'GET', '/nope', { token });
     expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Not found' });
   });
 
   it('rejects malformed JSON with 400', async () => {

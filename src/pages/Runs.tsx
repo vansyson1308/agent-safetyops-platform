@@ -10,15 +10,17 @@ import RiskScoreBar from "@/components/RiskScoreBar"
 import StatusBadge from "@/components/StatusBadge"
 import RunDialog from "@/components/dialogs/RunDialog"
 import type { Run } from "@/types"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 
 export default function Runs() {
   const [dialogOpen, setDialogOpen] = useState(false)
+  const { can } = useAuth()
 
   const { data: runs, isLoading } = useQuery({
     queryKey: ['runs'],
     queryFn: async () => {
-      const res = await fetch('/api/runs')
-      return res.json() as Promise<Run[]>
+      return api<Run[]>('/runs')
     }
   })
 
@@ -31,9 +33,11 @@ export default function Runs() {
           <h2 className="text-2xl font-bold tracking-tight">Execution Runs</h2>
           <p className="text-muted-foreground">Monitor and inspect agent execution pipelines.</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Play className="mr-2 h-4 w-4" /> Start New Run
-        </Button>
+        {can('operate') && (
+          <Button onClick={() => setDialogOpen(true)}>
+            <Play className="mr-2 h-4 w-4" /> Start New Run
+          </Button>
+        )}
       </div>
 
       <Card>

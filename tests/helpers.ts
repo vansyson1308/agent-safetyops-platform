@@ -59,3 +59,10 @@ export async function request(
   try { body = JSON.parse(text); } catch {}
   return { status: res.status, body };
 }
+
+// Creates a user with the given role and returns it with a signed token.
+export async function createUser(role: string, email = `${role}-${crypto.randomUUID()}@test.local`) {
+  const { generateToken } = await import('../src/middleware/auth.ts');
+  const user = await prisma.user.create({ data: { email, name: role, role } });
+  return { user, token: generateToken(user.id) };
+}

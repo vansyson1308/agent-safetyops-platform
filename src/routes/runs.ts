@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { analyzeRunRisk } from '../services/geminiService.ts';
 import { evaluateStep } from '../services/policyEngine.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
 
@@ -48,7 +49,7 @@ const createRunSchema = z.object({
 });
 
 // Create a new run
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('operate'), async (req, res) => {
   try {
     const parsed = createRunSchema.parse(req.body);
     const agent = await prisma.agent.findUnique({ where: { id: parsed.agentId } });
@@ -89,7 +90,7 @@ const addStepSchema = z.object({
 });
 
 // Add a step to a run
-router.post('/:id/steps', async (req, res) => {
+router.post('/:id/steps', requirePermission('operate'), async (req, res) => {
   try {
     const parsed = addStepSchema.parse(req.body);
     const run = await prisma.run.findUnique({
@@ -168,7 +169,7 @@ router.post('/:id/steps', async (req, res) => {
 });
 
 // Update run status
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('operate'), async (req, res) => {
   try {
     const { status, summary } = req.body;
     const data: Record<string, unknown> = {};
@@ -186,7 +187,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // Analyze run with Gemini AI
-router.post('/:id/analyze', async (req, res) => {
+router.post('/:id/analyze', requirePermission('operate'), async (req, res) => {
   try {
     const run = await prisma.run.findUnique({
       where: { id: req.params.id },

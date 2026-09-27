@@ -8,7 +8,15 @@ import apiRouter from './routes/index.ts';
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  // The UI is served from the same origin, so cross-origin access is off
+  // unless CORS_ORIGINS lists the origins that may call the API.
+  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (corsOrigins.length > 0) {
+    app.use(cors({ origin: corsOrigins }));
+  }
   app.use(express.json());
 
   app.use('/api', apiRouter);

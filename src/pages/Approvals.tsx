@@ -5,27 +5,23 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, XCircle, ShieldAlert } from "lucide-react"
 import type { ApprovalRequest } from "@/types"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 
 export default function Approvals() {
   const queryClient = useQueryClient()
+  const { can } = useAuth()
 
   const { data: approvals, isLoading } = useQuery({
     queryKey: ['approvals'],
     queryFn: async () => {
-      const res = await fetch('/api/approvals')
-      return res.json() as Promise<ApprovalRequest[]>
+      return api<ApprovalRequest[]>('/approvals')
     }
   })
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'denied' }) => {
-      const res = await fetch(`/api/approvals/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-      if (!res.ok) throw new Error('Failed to update approval')
-      return res.json()
+      return api(`/approvals/${id}`, { method: 'PATCH', body: { status } })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvals'] })
@@ -78,7 +74,7 @@ export default function Approvals() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {approval.status === 'pending' ? (
+                  {approval.status === 'pending' && can('approve') ? (
                     <div className="flex justify-end space-x-2">
                       <Button
                         size="sm"

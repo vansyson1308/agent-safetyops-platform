@@ -7,24 +7,25 @@ import { Button } from "@/components/ui/button"
 import { Plus, Bot, ShieldAlert, ShieldCheck, Shield, Trash2 } from "lucide-react"
 import AgentDialog from "@/components/dialogs/AgentDialog"
 import type { Agent } from "@/types"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 
 export default function Agents() {
   const queryClient = useQueryClient()
+  const { can } = useAuth()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editAgent, setEditAgent] = useState<Agent | null>(null)
 
   const { data: agents, isLoading } = useQuery({
     queryKey: ['agents'],
     queryFn: async () => {
-      const res = await fetch('/api/agents')
-      return res.json() as Promise<Agent[]>
+      return api<Agent[]>('/agents')
     }
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete agent')
+      await api(`/agents/${id}`, { method: 'DELETE' })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['agents'] }),
   })
@@ -41,9 +42,11 @@ export default function Agents() {
           <h2 className="text-2xl font-bold tracking-tight">AI Agents</h2>
           <p className="text-muted-foreground">Manage and configure your deployed AI agents.</p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Register Agent
-        </Button>
+        {can('manage') && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" /> Register Agent
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -96,10 +99,12 @@ export default function Agents() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right space-x-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleEdit(agent)}>Configure</Button>
-                  <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => deleteMutation.mutate(agent.id)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  {can('manage') && (<>
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(agent)}>Configure</Button>
+                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => deleteMutation.mutate(agent.id)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </>)}
                 </TableCell>
               </TableRow>
             ))}

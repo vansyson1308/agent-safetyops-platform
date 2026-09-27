@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import type { AuditEvent } from "@/types"
+import { api } from "@/lib/api"
 
 const eventTypeColors: Record<string, string> = {
   agent_created: 'bg-emerald-100 text-emerald-800',
@@ -29,8 +30,7 @@ export default function AuditLog() {
   const { data, isLoading } = useQuery({
     queryKey: ['audit-events'],
     queryFn: async () => {
-      const res = await fetch('/api/audit-events?limit=100')
-      return res.json()
+      return api('/audit-events?limit=100')
     }
   })
 

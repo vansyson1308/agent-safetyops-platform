@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, FileText, Download } from "lucide-react"
 import type { IncidentReport } from "@/types"
+import { api } from "@/lib/api"
 
 export default function Incidents() {
   const navigate = useNavigate()
@@ -13,8 +14,7 @@ export default function Incidents() {
   const { data: incidents, isLoading } = useQuery({
     queryKey: ['incidents'],
     queryFn: async () => {
-      const res = await fetch('/api/incidents')
-      return res.json() as Promise<IncidentReport[]>
+      return api<IncidentReport[]>('/incidents')
     }
   })
 

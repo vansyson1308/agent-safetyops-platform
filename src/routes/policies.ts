@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
 
@@ -48,7 +49,7 @@ const createPolicySchema = z.object({
 });
 
 // Create policy
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = createPolicySchema.parse(req.body);
     const policy = await prisma.policy.create({
@@ -102,7 +103,7 @@ const updatePolicySchema = z.object({
 });
 
 // Update policy
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = updatePolicySchema.parse(req.body);
     const data: Record<string, unknown> = {};
@@ -142,7 +143,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete policy
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('manage'), async (req, res) => {
   try {
     await prisma.policy.delete({ where: { id: req.params.id } });
 

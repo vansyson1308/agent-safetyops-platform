@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
 
@@ -47,7 +48,7 @@ const createIncidentSchema = z.object({
 });
 
 // Create incident
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('operate'), async (req, res) => {
   try {
     const parsed = createIncidentSchema.parse(req.body);
     const incident = await prisma.incidentReport.create({
@@ -79,7 +80,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update incident
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('operate'), async (req, res) => {
   try {
     const { remediation, severity } = req.body;
     const data: Record<string, unknown> = {};

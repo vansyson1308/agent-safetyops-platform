@@ -21,7 +21,7 @@ router.use('/auth', authRouter);
 // SDK routes (authenticated via API key)
 router.use('/v1/sdk', sdkRouter);
 
-// Protected routes (JWT or fallback mock auth)
+// Everything below requires a signed-in user
 router.use(requireAuth);
 router.use('/agents', agentsRouter);
 router.use('/policies', policiesRouter);

@@ -40,7 +40,27 @@ npm run seed
 npm run dev
 ```
 
-Open `http://localhost:3000` - you'll see a dashboard with pre-seeded demo data.
+Open `http://localhost:3000` and sign in with a seeded demo account:
+
+| Email | Password | Role |
+|-------|----------|------|
+| `admin@safetyops.ai` | `admin123` | admin |
+| `analyst@safetyops.ai` | `analyst123` | analyst |
+
+The seed data is for local demos only. On a fresh database without the seed, the first account you register becomes the instance owner.
+
+## Access Control
+
+Every API route except `/api/health`, `/api/auth/*` and the SDK endpoints requires a signed-in user (`Authorization: Bearer <jwt>`). Roles grant:
+
+| Role | Read everything | Runs, incidents, browser sessions | Approve / deny | Agents, policies, API keys |
+|------|:---:|:---:|:---:|:---:|
+| owner, admin | ✓ | ✓ | ✓ | ✓ |
+| analyst | ✓ | ✓ | | |
+| approver | ✓ | | ✓ | |
+| viewer | ✓ | | | |
+
+Open sign-up is disabled by default. Set `ALLOW_REGISTRATION=true` to let anyone create a `viewer` account.
 
 ## Architecture
 
@@ -150,7 +170,9 @@ Then run `npx prisma migrate dev --name init`.
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | Database URL. SQLite paths are relative to `prisma/` (e.g. `file:./dev.db`) |
 | `GEMINI_API_KEY` | No | Google Gemini API key for AI risk scoring |
-| `JWT_SECRET` | No | Secret for JWT tokens (auto-generated in dev) |
+| `JWT_SECRET` | In production | Secret for signing JWTs. The server refuses to start without it when `NODE_ENV=production`; in development a random one is generated per start |
+| `ALLOW_REGISTRATION` | No | `true` lets anyone register a `viewer` account (default: only the first account can register) |
+| `CORS_ORIGINS` | No | Comma-separated origins allowed to call the API cross-origin (default: same-origin only) |
 | `PORT` | No | Server port (default: 3000) |
 
 ## API Endpoints
@@ -166,7 +188,9 @@ Then run `npx prisma migrate dev --name init`.
 | GET/POST | `/api/browser-sessions` | Browser sandbox |
 | GET | `/api/audit-events` | Audit trail |
 | POST | `/api/auth/login` | JWT login |
-| POST | `/api/auth/register` | User registration |
+| POST | `/api/auth/register` | User registration (first user, or when `ALLOW_REGISTRATION=true`) |
+| GET | `/api/auth/me` | Current user |
+| GET | `/api/auth/status` | Whether first-time setup or registration is available |
 | POST | `/api/v1/sdk/runs` | SDK: Start run |
 | POST | `/api/v1/sdk/runs/:id/steps` | SDK: Report step |
 | GET | `/api/v1/sdk/runs/:id/decision` | SDK: Check decision |

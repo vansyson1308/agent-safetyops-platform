@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
 
@@ -48,7 +49,7 @@ const createAgentSchema = z.object({
 });
 
 // Create agent
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = createAgentSchema.parse(req.body);
     const agent = await prisma.agent.create({
@@ -95,7 +96,7 @@ const updateAgentSchema = z.object({
 });
 
 // Update agent
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = updateAgentSchema.parse(req.body);
     const data: Record<string, unknown> = { ...parsed };
@@ -125,7 +126,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete agent (soft delete)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('manage'), async (req, res) => {
   try {
     const agent = await prisma.agent.update({
       where: { id: req.params.id },
