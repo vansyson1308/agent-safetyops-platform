@@ -29,6 +29,7 @@ As AI agents become more autonomous, organizations need guardrails:
 git clone https://github.com/vansyson1308/agent-safetyops-platform.git
 cd agent-safetyops-platform
 npm install
+cp .env.example .env
 
 # Set up database
 npx prisma generate
@@ -122,35 +123,32 @@ Monitor AI agents performing browser automation:
 ### Docker
 ```bash
 docker build -t safetyops .
-docker run -p 3000:3000 -e GEMINI_API_KEY=your_key safetyops
+docker run -p 3000:3000 -v safetyops-data:/app/data \
+  -e JWT_SECRET=$(openssl rand -hex 32) -e GEMINI_API_KEY=your_key safetyops
 ```
+The container creates its SQLite database in `/app/data` on start, so mount a volume there to keep data.
 
 ### Docker Compose
 ```bash
-docker-compose up
+export JWT_SECRET=$(openssl rand -hex 32)
+docker compose up
 ```
 
 ### Google Cloud Run
 ```bash
 gcloud builds submit --tag gcr.io/YOUR_PROJECT/safetyops
-gcloud run deploy safetyops --image gcr.io/YOUR_PROJECT/safetyops --set-env-vars="GEMINI_API_KEY=your_key"
+gcloud run deploy safetyops --image gcr.io/YOUR_PROJECT/safetyops --set-env-vars="GEMINI_API_KEY=your_key,JWT_SECRET=your_secret"
 ```
 
 ### PostgreSQL (Production)
-Update `prisma/schema.prisma`:
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-```
+Change the datasource `provider` in `prisma/schema.prisma` to `"postgresql"` and point `DATABASE_URL` at your database.
 Then run `npx prisma migrate dev --name init`.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | No | Database URL (defaults to SQLite) |
+| `DATABASE_URL` | Yes | Database URL. SQLite paths are relative to `prisma/` (e.g. `file:./dev.db`) |
 | `GEMINI_API_KEY` | No | Google Gemini API key for AI risk scoring |
 | `JWT_SECRET` | No | Secret for JWT tokens (auto-generated in dev) |
 | `PORT` | No | Server port (default: 3000) |

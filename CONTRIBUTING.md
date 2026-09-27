@@ -11,6 +11,7 @@ cd agent-safetyops-platform
 
 # Install dependencies
 npm install
+cp .env.example .env
 
 # Set up database
 npx prisma generate
