@@ -168,8 +168,9 @@ export async function finishRun(
   return prisma.run.findUniqueOrThrow({ where: { id: run.id } });
 }
 
-// Approves or denies a pending request. Approving resumes the run once no
-// other request for it is pending; denying fails it.
+// Approves or denies a pending request, for a run step or a browser action.
+// Approving resumes the run/session once nothing else for it is pending;
+// denying fails it.
 export async function resolveApproval(approvalId: string, decision: 'approved' | 'denied', approverId: string) {
   const result = await prisma.$transaction(async (tx) => {
     const claimed = await tx.approvalRequest.updateMany({
@@ -180,19 +181,24 @@ export async function resolveApproval(approvalId: string, decision: 'approved' |
     if (!approval) throw new RunServiceError('Approval request not found', 404);
     if (claimed.count === 0) throw new RunServiceError('Approval already processed', 409);
 
-    if (decision === 'denied') {
+    const onHold = { in: ['paused', 'blocked'] };
+    const stillPending = decision === 'approved'
+      ? await tx.approvalRequest.count({
+        where: approval.runId ? { runId: approval.runId, status: 'pending' } : { sessionId: approval.sessionId, status: 'pending' },
+      })
+      : 0;
+    if (decision === 'approved' && stillPending > 0) return approval;
+
+    if (approval.runId) {
       await tx.run.updateMany({
-        where: { id: approval.runId, status: { in: ['paused', 'blocked'] } },
-        data: { status: 'failed' },
+        where: { id: approval.runId, status: onHold },
+        data: { status: decision === 'approved' ? 'running' : 'failed' },
       });
-    } else {
-      const stillPending = await tx.approvalRequest.count({ where: { runId: approval.runId, status: 'pending' } });
-      if (stillPending === 0) {
-        await tx.run.updateMany({
-          where: { id: approval.runId, status: { in: ['paused', 'blocked'] } },
-          data: { status: 'running' },
-        });
-      }
+    } else if (approval.sessionId) {
+      await tx.browserSession.updateMany({
+        where: { id: approval.sessionId, status: onHold },
+        data: { status: decision === 'approved' ? 'active' : 'failed' },
+      });
     }
     return approval;
   });
@@ -202,7 +208,7 @@ export async function resolveApproval(approvalId: string, decision: 'approved' |
     resourceType: 'approval_request',
     resourceId: result.id,
     actorId: approverId,
-    details: { runId: result.runId, status: decision },
+    details: { runId: result.runId, sessionId: result.sessionId, status: decision },
   });
   return result;
 }

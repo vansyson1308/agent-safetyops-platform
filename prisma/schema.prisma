@@ -132,11 +132,16 @@ model RunStep {
   @@unique([runId, sequence])
 }
 
+// Targets either a run step (runId + stepId) or a browser action
+// (sessionId + browserActionId).
 model ApprovalRequest {
   id            String   @id @default(uuid())
-  runId         String
-  run           Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
-  stepId        String?  // Optional, if tied to a specific step
+  runId         String?
+  run           Run?     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stepId        String?
+  sessionId     String?
+  session       BrowserSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  browserActionId String?
   status        String   @default("pending") // pending, approved, denied, modified
   reason        String
   proposedAction String  // JSON
@@ -180,7 +185,7 @@ model IncidentReport {
 model BrowserSession {
   id            String   @id @default(uuid())
   url           String
-  status        String   @default("active") // active, completed, failed, blocked
+  status        String   @default("active") // active, paused, blocked, completed, failed
   riskScore     Int?
   summary       String?
   
@@ -195,6 +200,7 @@ model BrowserSession {
 
   actions       BrowserAction[]
   artifacts     BrowserArtifact[]
+  approvals     ApprovalRequest[]
 }
 
 model BrowserAction {
@@ -212,6 +218,8 @@ model BrowserAction {
   explanation   String?  // Gemini-powered risk explanation
   
   createdAt     DateTime @default(now())
+
+  @@unique([sessionId, sequence])
 }
 
 model BrowserArtifact {

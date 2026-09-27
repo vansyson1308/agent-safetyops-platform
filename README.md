@@ -144,7 +144,9 @@ A paused or blocked run cannot be resumed or completed any other way; it can onl
 
 ### Browser Sandboxing
 Monitor AI agents performing browser automation:
-- Per-action risk assessment using Gemini AI
+- Every action is checked against the session agent's policies (domains, and blocked tools named `browser.navigate`, `browser.type`, etc.) and, when `GEMINI_API_KEY` is set, by Gemini. The stricter verdict wins
+- If the Gemini check fails, the action is held for human review rather than allowed. Without a key, only policies apply
+- A held action pauses or blocks the session and creates an approval request for it
 - Credential entry detection and blocking
 - Session replay with action timeline
 - Artifact capture (screenshots, extracted text)
@@ -181,6 +183,7 @@ Then run `npx prisma migrate dev --name init`.
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | Database URL. SQLite paths are relative to `prisma/` (e.g. `file:./dev.db`) |
 | `GEMINI_API_KEY` | No | Google Gemini API key for AI risk scoring |
+| `GEMINI_MODEL` | No | Gemini model for risk scoring (default: `gemini-3.1-pro-preview`) |
 | `JWT_SECRET` | In production | Secret for signing JWTs. The server refuses to start without it when `NODE_ENV=production`; in development a random one is generated per start |
 | `ALLOW_REGISTRATION` | No | `true` lets anyone register a `viewer` account (default: only the first account can register) |
 | `CORS_ORIGINS` | No | Comma-separated origins allowed to call the API cross-origin (default: same-origin only) |

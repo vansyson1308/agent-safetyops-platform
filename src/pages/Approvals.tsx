@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Link } from "react-router-dom"
 import { CheckCircle, XCircle, ShieldAlert } from "lucide-react"
 import type { ApprovalRequest } from "@/types"
 import { api } from "@/lib/api"
@@ -26,6 +27,7 @@ export default function Approvals() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvals'] })
       queryClient.invalidateQueries({ queryKey: ['runs'] })
+      queryClient.invalidateQueries({ queryKey: ['browser-sessions'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
     },
   })
@@ -43,7 +45,7 @@ export default function Approvals() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Run ID</TableHead>
+              <TableHead>Target</TableHead>
               <TableHead>Reason</TableHead>
               <TableHead>Proposed Action</TableHead>
               <TableHead>Status</TableHead>
@@ -53,7 +55,19 @@ export default function Approvals() {
           <TableBody>
             {approvals?.map((approval) => (
               <TableRow key={approval.id}>
-                <TableCell className="font-mono text-xs">{approval.runId.substring(0, 8)}</TableCell>
+                <TableCell className="text-xs">
+                  {approval.runId ? (
+                    <Link to={`/runs/${approval.runId}`} className="hover:underline">
+                      <div className="font-medium">{approval.run?.agent?.name ?? "Run"}</div>
+                      <div className="font-mono text-slate-500">run {approval.runId.substring(0, 8)}</div>
+                    </Link>
+                  ) : approval.sessionId ? (
+                    <Link to={`/browser-sessions/${approval.sessionId}`} className="hover:underline">
+                      <div className="font-medium">Browser session</div>
+                      <div className="text-slate-500 break-all">{approval.session?.url}</div>
+                    </Link>
+                  ) : null}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-start space-x-2">
                     <ShieldAlert className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />

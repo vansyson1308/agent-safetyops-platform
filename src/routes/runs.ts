@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
-import { analyzeRunRisk } from '../services/geminiService.ts';
+import { analyzeRunRisk, isGeminiConfigured } from '../services/geminiService.ts';
 import { finishRun, recordStep, RunServiceError } from '../services/runService.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 import { requirePermission } from '../middleware/auth.ts';
@@ -170,6 +170,9 @@ router.patch('/:id', requirePermission('operate'), async (req, res) => {
 
 // Analyze run with Gemini AI
 router.post('/:id/analyze', requirePermission('operate'), async (req, res) => {
+  if (!isGeminiConfigured()) {
+    return res.status(503).json({ error: 'AI risk analysis is not configured (set GEMINI_API_KEY)' });
+  }
   try {
     const run = await prisma.run.findUnique({
       where: { id: req.params.id },
@@ -191,7 +194,7 @@ router.post('/:id/analyze', requirePermission('operate'), async (req, res) => {
     res.json(analysis);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to analyze run' });
+    res.status(502).json({ error: 'AI risk analysis failed' });
   }
 });
 

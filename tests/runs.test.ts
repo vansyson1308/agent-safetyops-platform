@@ -97,6 +97,14 @@ describe('run status changes', () => {
   });
 });
 
+describe('AI analysis', () => {
+  it('reports when Gemini is not configured instead of failing opaquely', async () => {
+    const runId = await startRun();
+    const res = await call(analyst, 'POST', `/runs/${runId}/analyze`);
+    expect(res.status).toBe(503);
+  });
+});
+
 describe('approvals', () => {
   it('resumes the run when approved', async () => {
     const { runId, approvalId } = await blockRun('refund');

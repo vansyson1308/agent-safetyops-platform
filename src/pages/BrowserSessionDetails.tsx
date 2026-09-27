@@ -152,7 +152,14 @@ export default function BrowserSessionDetails() {
           <CardHeader>
             <CardTitle>Simulate Action</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {session.status !== 'active' && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-3">
+                {session.status === 'paused' || session.status === 'blocked'
+                  ? <>This session is {session.status} until its pending request is decided on the <Link to="/approvals" className="underline">Approvals</Link> page.</>
+                  : <>This session is {session.status} and accepts no more actions.</>}
+              </p>
+            )}
             <form onSubmit={handleActionSubmit} className="flex flex-wrap gap-4 items-end">
               <div className="space-y-2 flex-1 min-w-[200px]">
                 <label className="text-sm font-medium">Action Type</label>
@@ -177,7 +184,7 @@ export default function BrowserSessionDetails() {
                 <label className="text-sm font-medium">Value (Text to type)</label>
                 <Input value={value} onChange={e => setValue(e.target.value)} placeholder="e.g. mypassword" disabled={actionType !== 'type'} />
               </div>
-              <Button type="submit" disabled={actionMutation.isPending}>
+              <Button type="submit" disabled={actionMutation.isPending || session.status !== 'active'}>
                 <Plus className="mr-2 h-4 w-4" /> Execute
               </Button>
             </form>

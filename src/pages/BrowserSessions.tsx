@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input"
 import { Globe, ShieldAlert, Activity, Plus } from "lucide-react"
 import RiskScoreBar from "@/components/RiskScoreBar"
 import StatusBadge from "@/components/StatusBadge"
-import type { BrowserSession } from "@/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { Agent, BrowserSession } from "@/types"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
 export default function BrowserSessions() {
   const [newUrl, setNewUrl] = useState("")
+  const [agentId, setAgentId] = useState("")
   const queryClient = useQueryClient()
   const { can } = useAuth()
   const navigate = useNavigate()
@@ -26,9 +28,16 @@ export default function BrowserSessions() {
     }
   })
 
+  const { data: agents } = useQuery({
+    queryKey: ['agents'],
+    queryFn: () => api<Agent[]>('/agents'),
+    enabled: can('operate'),
+  })
+
   const createMutation = useMutation({
     mutationFn: async (url: string) => {
-      return api('/browser-sessions', { method: 'POST', body: { url } })
+      // The agent's policies apply to the session's actions.
+      return api('/browser-sessions', { method: 'POST', body: { url, agentId: agentId || undefined } })
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['browser-sessions'] })
@@ -50,6 +59,14 @@ export default function BrowserSessions() {
         </div>
         {can('operate') && (
           <form onSubmit={handleCreate} className="flex space-x-2">
+            <Select value={agentId} onValueChange={setAgentId}>
+              <SelectTrigger className="w-48"><SelectValue placeholder="Agent (optional)" /></SelectTrigger>
+              <SelectContent>
+                {agents?.filter(agent => agent.status === 'active').map(agent => (
+                  <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input type="url" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required className="w-64" />
             <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending ? <Activity className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}

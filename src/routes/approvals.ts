@@ -15,6 +15,7 @@ router.get('/', async (req, res) => {
       where,
       include: {
         run: { select: { task: true, agent: { select: { name: true } } } },
+        session: { select: { url: true, agent: { select: { name: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });

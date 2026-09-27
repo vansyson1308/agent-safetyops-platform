@@ -275,7 +275,7 @@ async function main() {
     },
   });
 
-  await prisma.browserAction.create({
+  const credentialAction = await prisma.browserAction.create({
     data: {
       sessionId: browserSession.id,
       sequence: 2,
@@ -286,6 +286,16 @@ async function main() {
       riskScore: 90,
       policyViolations: JSON.stringify([policy1.id]),
       explanation: 'Attempted to input credentials into a login form. This violates the policy against automated credential entry on financial sites.',
+    },
+  });
+
+  await prisma.approvalRequest.create({
+    data: {
+      sessionId: browserSession.id,
+      browserActionId: credentialAction.id,
+      status: 'pending',
+      reason: 'Attempted to input credentials into a login form on a financial site.',
+      proposedAction: JSON.stringify({ actionType: 'type', target: '#username', value: 'admin_user', url: 'https://example-bank.com/login' }),
     },
   });
 
@@ -324,7 +334,7 @@ async function main() {
   console.log(`  - ${3} agents`);
   console.log(`  - ${2} policies`);
   console.log(`  - ${3} runs with steps`);
-  console.log(`  - ${1} approval request`);
+  console.log(`  - ${2} approval requests`);
   console.log(`  - ${1} incident report`);
   console.log(`  - ${1} browser session with actions`);
 }
