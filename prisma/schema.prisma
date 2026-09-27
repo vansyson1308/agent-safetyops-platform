@@ -128,6 +128,8 @@ model RunStep {
   policyViolations String? // JSON array of policy IDs
   
   createdAt     DateTime @default(now())
+
+  @@unique([runId, sequence])
 }
 
 model ApprovalRequest {
@@ -228,8 +230,8 @@ model ApiKey {
   name        String
   keyHash     String    @unique
   prefix      String    // First 8 chars for display: "sk-abc123..."
-  agentId     String?
-  agent       Agent?    @relation(fields: [agentId], references: [id])
+  agentId     String    // Keys act for exactly one agent
+  agent       Agent     @relation(fields: [agentId], references: [id])
   createdById String
   createdBy   User      @relation(fields: [createdById], references: [id])
   lastUsedAt  DateTime?

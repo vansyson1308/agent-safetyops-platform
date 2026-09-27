@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { analyzeRunRisk } from '../services/geminiService.ts';
-import { evaluateStep } from '../services/policyEngine.ts';
+import { finishRun, recordStep, RunServiceError } from '../services/runService.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 import { requirePermission } from '../middleware/auth.ts';
 
@@ -89,99 +89,81 @@ const addStepSchema = z.object({
   actionOutput: z.string().optional(),
 });
 
+// Policies are evaluated against parsed input. Input that is not a JSON
+// object is still evaluated (as raw text), so it cannot hide a domain.
+function parseActionInput(raw: string | undefined): Record<string, unknown> | undefined {
+  if (raw === undefined) return undefined;
+  try {
+    const value = JSON.parse(raw);
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  } catch {}
+  return { input: raw };
+}
+
 // Add a step to a run
 router.post('/:id/steps', requirePermission('operate'), async (req, res) => {
   try {
     const parsed = addStepSchema.parse(req.body);
-    const run = await prisma.run.findUnique({
-      where: { id: req.params.id },
-      include: { steps: true },
-    });
-    if (!run) return res.status(404).json({ error: 'Run not found' });
-    if (run.status !== 'running') return res.status(400).json({ error: 'Run is not in running state' });
-
-    const sequence = run.steps.length + 1;
-
-    // Evaluate step against policies
-    let inputObj: Record<string, unknown> = {};
-    try { inputObj = JSON.parse(parsed.actionInput || '{}'); } catch {}
-
-    const decision = await evaluateStep({
-      actionType: parsed.actionType,
-      actionName: parsed.actionName,
-      actionInput: inputObj,
-      agentId: run.agentId,
-      stepNumber: sequence,
-    });
-
-    const step = await prisma.runStep.create({
-      data: {
-        runId: run.id,
-        sequence,
+    const result = await recordStep(
+      req.params.id,
+      {
         actionType: parsed.actionType,
         actionName: parsed.actionName,
-        actionInput: parsed.actionInput,
-        actionOutput: parsed.actionOutput,
-        classification: decision.classification,
-        riskScore: decision.riskScore,
-        policyViolations: decision.violations.length > 0 ? JSON.stringify(decision.violations) : null,
+        actionInput: parseActionInput(parsed.actionInput),
+        storedInput: parsed.actionInput ?? null,
+        storedOutput: parsed.actionOutput ?? null,
       },
-    });
-
-    // If blocked, update run status and create approval request
-    if (decision.classification === 'blocked' || decision.classification === 'requires_approval') {
-      await prisma.run.update({
-        where: { id: run.id },
-        data: { status: decision.classification === 'blocked' ? 'blocked' : 'paused' },
-      });
-
-      await prisma.approvalRequest.create({
-        data: {
-          runId: run.id,
-          stepId: step.id,
-          status: 'pending',
-          reason: decision.reason,
-          proposedAction: JSON.stringify({
-            actionType: parsed.actionType,
-            actionName: parsed.actionName,
-            input: inputObj,
-          }),
-        },
-      });
-
-      await writeAuditEvent({
-        eventType: 'step_blocked',
-        resourceType: 'run_step',
-        resourceId: step.id,
-        actorId: req.user!.id,
-        details: { runId: run.id, reason: decision.reason },
-      });
-    }
-
-    res.status(201).json({ step, decision });
+      { id: req.user!.id, source: 'api' },
+    );
+    res.status(201).json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
+    if (error instanceof RunServiceError) {
+      return res.status(error.status).json({ error: error.message });
     }
     console.error(error);
     res.status(500).json({ error: 'Failed to add step' });
   }
 });
 
-// Update run status
+const updateRunSchema = z.object({
+  // Blocked and paused runs resume only through approvals.
+  status: z.enum(['completed', 'failed']).optional(),
+  summary: z.string().max(10_000).optional(),
+});
+
+// Complete or cancel a run, or edit its summary
 router.patch('/:id', requirePermission('operate'), async (req, res) => {
   try {
-    const { status, summary } = req.body;
-    const data: Record<string, unknown> = {};
-    if (status) data.status = status;
-    if (summary) data.summary = summary;
+    const parsed = updateRunSchema.parse(req.body);
+    const actor = { id: req.user!.id, source: 'api' as const };
 
-    const run = await prisma.run.update({
-      where: { id: req.params.id },
-      data: data as any,
+    if (parsed.status) {
+      return res.json(await finishRun(req.params.id, parsed.status, actor, parsed.summary));
+    }
+
+    const existing = await prisma.run.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Run not found' });
+    if (parsed.summary === undefined) return res.json(existing);
+
+    const run = await prisma.run.update({ where: { id: existing.id }, data: { summary: parsed.summary } });
+    await writeAuditEvent({
+      eventType: 'run_updated',
+      resourceType: 'run',
+      resourceId: run.id,
+      actorId: actor.id,
+      details: { summary: parsed.summary },
     });
     res.json(run);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
+    if (error instanceof RunServiceError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Failed to update run' });
   }
 });

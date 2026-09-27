@@ -1,19 +1,12 @@
-import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Key, Webhook, Shield, Plus, Copy, Check } from "lucide-react"
+import { Webhook, Shield, Plus } from "lucide-react"
+import ApiKeysCard from "@/components/ApiKeysCard"
+import { useAuth } from "@/lib/auth"
 
 export default function Settings() {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  const { can } = useAuth()
 
   return (
     <div className="space-y-6">
@@ -54,39 +47,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-2">
-              <Key className="w-5 h-5" />
-              <span>SDK API Keys</span>
-            </CardTitle>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" /> Generate Key
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-md">
-              <div>
-                <p className="text-sm font-medium">Default SDK Key</p>
-                <code className="text-xs text-slate-500">sk-safetyops-••••••••</code>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Badge variant="secondary" className="text-[10px]">Created: Today</Badge>
-                <Button variant="ghost" size="sm" onClick={() => handleCopy('sk-safetyops-example')}>
-                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-slate-500">
-              Use SDK API keys to authenticate agent requests to the SafetyOps API.
-              See the SDK documentation for integration details.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {can('manage') && <ApiKeysCard />}
 
       <Card>
         <CardHeader>

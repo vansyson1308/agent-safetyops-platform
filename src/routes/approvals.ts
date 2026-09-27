@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
-import { writeAuditEvent } from '../services/auditService.ts';
+import { resolveApproval, RunServiceError } from '../services/runService.ts';
 import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
@@ -32,46 +32,14 @@ const updateApprovalSchema = z.object({
 router.patch('/:id', requirePermission('approve'), async (req, res) => {
   try {
     const parsed = updateApprovalSchema.parse(req.body);
-
-    const approval = await prisma.approvalRequest.findUnique({
-      where: { id: req.params.id },
-    });
-    if (!approval) return res.status(404).json({ error: 'Approval request not found' });
-    if (approval.status !== 'pending') return res.status(400).json({ error: 'Approval already processed' });
-
-    const updated = await prisma.approvalRequest.update({
-      where: { id: req.params.id },
-      data: {
-        status: parsed.status,
-        approverId: req.user!.id,
-      },
-    });
-
-    // Resume or fail the associated run
-    if (parsed.status === 'approved') {
-      await prisma.run.update({
-        where: { id: approval.runId },
-        data: { status: 'running' },
-      });
-    } else {
-      await prisma.run.update({
-        where: { id: approval.runId },
-        data: { status: 'failed' },
-      });
-    }
-
-    await writeAuditEvent({
-      eventType: parsed.status === 'approved' ? 'approval_granted' : 'approval_denied',
-      resourceType: 'approval_request',
-      resourceId: updated.id,
-      actorId: req.user!.id,
-      details: { runId: approval.runId, status: parsed.status },
-    });
-
-    res.json(updated);
+    const approval = await resolveApproval(req.params.id, parsed.status, req.user!.id);
+    res.json(approval);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
+    if (error instanceof RunServiceError) {
+      return res.status(error.status).json({ error: error.message });
     }
     res.status(500).json({ error: 'Failed to update approval' });
   }

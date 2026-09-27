@@ -198,10 +198,9 @@ export interface ApiKey {
   id: string;
   name: string;
   prefix: string;
-  agentId: string | null;
-  agent?: Agent | null;
-  createdById: string;
-  createdBy?: User;
+  agentId: string;
+  agent?: Pick<Agent, 'name'>;
+  createdBy?: Pick<User, 'name' | 'email'>;
   lastUsedAt: string | null;
   expiresAt: string | null;
   createdAt: string;

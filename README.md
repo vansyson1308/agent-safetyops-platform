@@ -86,14 +86,14 @@ Frontend (React 19 + Vite)          Backend (Express.js)
 
 ## SDK Integration
 
-SafetyOps provides a REST API that any AI agent framework can integrate with:
+SafetyOps provides a REST API that any AI agent framework can integrate with. An admin creates an API key for an agent under **Settings → SDK API Keys**; the key is shown once and can only act for that agent.
 
 ```typescript
-// 1. Start a run
+// 1. Start a run (for the key's agent)
 const run = await fetch('/api/v1/sdk/runs', {
   method: 'POST',
   headers: { 'Authorization': 'Bearer sk-your-api-key', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ task: 'Process refund for order #12345', agentId: 'agent-uuid' })
+  body: JSON.stringify({ task: 'Process refund for order #12345' })
 });
 
 // 2. Report each action step
@@ -112,6 +112,13 @@ const status = await fetch(`/api/v1/sdk/runs/${runId}/decision`, {
   headers: { 'Authorization': 'Bearer sk-your-api-key' }
 });
 // { blocked: true, pendingApprovals: 1, status: 'blocked' }
+
+// 4. Finish (only possible while the run is running, i.e. not waiting on approval)
+await fetch(`/api/v1/sdk/runs/${runId}/complete`, {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer sk-your-api-key', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ summary: 'Refund processed' })
+});
 ```
 
 ## Key Features
@@ -130,8 +137,10 @@ Policies apply globally or to one agent. The engine fails closed: a policy or ru
 When a policy violation is detected:
 1. The agent's run is automatically paused/blocked
 2. An approval request is created with full context
-3. A human reviewer can approve or deny the action
-4. The run resumes or fails based on the decision
+3. A human reviewer (approver, admin or owner) can approve or deny the action
+4. The run resumes once every pending request is approved, or fails if one is denied
+
+A paused or blocked run cannot be resumed or completed any other way; it can only be cancelled (marked failed).
 
 ### Browser Sandboxing
 Monitor AI agents performing browser automation:
@@ -183,7 +192,9 @@ Then run `npx prisma migrate dev --name init`.
 |--------|----------|-------------|
 | GET/POST/PUT/DELETE | `/api/agents` | Agent CRUD |
 | GET/POST/PUT/DELETE | `/api/policies` | Policy CRUD |
-| GET/POST/PATCH | `/api/runs` | Execution runs |
+| GET/POST | `/api/runs` | Execution runs |
+| POST | `/api/runs/:id/steps` | Record a step (evaluated against policies) |
+| PATCH | `/api/runs/:id` | Complete (`completed`) or cancel (`failed`) a run, or edit its summary |
 | POST | `/api/runs/:id/analyze` | AI risk analysis |
 | GET/PATCH | `/api/approvals` | Approval workflow |
 | GET/POST/PATCH | `/api/incidents` | Incident management |
@@ -196,6 +207,8 @@ Then run `npx prisma migrate dev --name init`.
 | POST | `/api/v1/sdk/runs` | SDK: Start run |
 | POST | `/api/v1/sdk/runs/:id/steps` | SDK: Report step |
 | GET | `/api/v1/sdk/runs/:id/decision` | SDK: Check decision |
+| POST | `/api/v1/sdk/runs/:id/complete` | SDK: Complete run |
+| GET/POST/DELETE | `/api/api-keys` | Manage SDK API keys (admin) |
 
 ## Contributing
 

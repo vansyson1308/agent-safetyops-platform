@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.ts';
 export type AuditEventType =
   | 'agent_created' | 'agent_updated' | 'agent_deleted'
   | 'policy_created' | 'policy_updated' | 'policy_deleted'
-  | 'run_started' | 'run_completed' | 'run_failed' | 'run_blocked'
+  | 'run_started' | 'run_completed' | 'run_failed' | 'run_blocked' | 'run_updated'
   | 'step_blocked' | 'step_flagged'
   | 'approval_requested' | 'approval_granted' | 'approval_denied'
   | 'incident_created' | 'incident_updated'
