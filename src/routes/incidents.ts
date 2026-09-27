@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
+import { parsePagination } from '../lib/pagination.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 import { requirePermission } from '../middleware/auth.ts';
 
@@ -9,15 +10,20 @@ const router = Router();
 // List all incidents
 router.get('/', async (req, res) => {
   try {
+    const page = parsePagination(req.query);
     const incidents = await prisma.incidentReport.findMany({
       include: {
         run: { select: { task: true, agent: { select: { name: true } } } },
         reporter: { select: { name: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
+      ...page,
     });
     res.json(incidents);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid pagination', details: error.issues });
+    }
     res.status(500).json({ error: 'Failed to fetch incidents' });
   }
 });
@@ -51,6 +57,9 @@ const createIncidentSchema = z.object({
 router.post('/', requirePermission('operate'), async (req, res) => {
   try {
     const parsed = createIncidentSchema.parse(req.body);
+    if (!(await prisma.run.findUnique({ where: { id: parsed.runId }, select: { id: true } }))) {
+      return res.status(400).json({ error: 'Run not found' });
+    }
     const incident = await prisma.incidentReport.create({
       data: {
         runId: parsed.runId,
@@ -79,29 +88,32 @@ router.post('/', requirePermission('operate'), async (req, res) => {
   }
 });
 
+const updateIncidentSchema = z.object({
+  remediation: z.string().max(10_000).nullable().optional(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+});
+
 // Update incident
 router.patch('/:id', requirePermission('operate'), async (req, res) => {
   try {
-    const { remediation, severity } = req.body;
-    const data: Record<string, unknown> = {};
-    if (remediation !== undefined) data.remediation = remediation;
-    if (severity !== undefined) data.severity = severity;
-
-    const incident = await prisma.incidentReport.update({
-      where: { id: req.params.id },
-      data: data as any,
-    });
+    const parsed = updateIncidentSchema.parse(req.body);
+    const updated = await prisma.incidentReport.updateMany({ where: { id: req.params.id }, data: parsed });
+    if (updated.count === 0) return res.status(404).json({ error: 'Incident not found' });
+    const incident = await prisma.incidentReport.findUniqueOrThrow({ where: { id: req.params.id } });
 
     await writeAuditEvent({
       eventType: 'incident_updated',
       resourceType: 'incident',
       resourceId: incident.id,
       actorId: req.user!.id,
-      details: data,
+      details: parsed,
     });
 
     res.json(incident);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
     res.status(500).json({ error: 'Failed to update incident' });
   }
 });

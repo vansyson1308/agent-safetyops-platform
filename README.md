@@ -20,7 +20,7 @@ As AI agents become more autonomous, organizations need guardrails:
 - **Risk Scoring** - AI-powered risk assessment (Google Gemini) analyzes every action for potential security threats
 - **Browser Sandboxing** - Monitor and control agent browser automation with per-action risk classification
 - **Complete Audit Trail** - Every action, decision, and approval is logged for regulatory compliance
-- **SDK Integration** - TypeScript SDK lets any AI agent framework integrate with SafetyOps in minutes
+- **SDK Integration** - A REST API with per-agent API keys lets any AI agent framework integrate with SafetyOps
 
 ## Quick Start
 

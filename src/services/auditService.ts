@@ -10,7 +10,6 @@ export type AuditEventType =
   | 'incident_created' | 'incident_updated'
   | 'browser_session_created' | 'browser_action_blocked'
   | 'api_key_created' | 'api_key_deleted'
-  | 'webhook_created' | 'webhook_deleted'
   | 'user_login' | 'user_registered';
 
 export async function writeAuditEvent(params: {

@@ -210,18 +210,6 @@ export interface ApiKey {
   createdAt: string;
 }
 
-// --- Webhook (new model for event dispatch) ---
-
-export interface Webhook {
-  id: string;
-  url: string;
-  events: string; // JSON array of event types
-  secret: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 // --- API Response Types ---
 
 export interface DashboardStats {

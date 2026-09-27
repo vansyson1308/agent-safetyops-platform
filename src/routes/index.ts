@@ -12,6 +12,7 @@ import auditEventsRouter from './audit-events.ts';
 import dashboardRouter from './dashboard.ts';
 import sdkRouter from './sdk.ts';
 import apiKeysRouter from './api-keys.ts';
+import settingsRouter from './settings.ts';
 
 const router = Router();
 
@@ -33,5 +34,6 @@ router.use('/browser-sessions', browserSessionsRouter);
 router.use('/audit-events', auditEventsRouter);
 router.use('/dashboard', dashboardRouter);
 router.use('/api-keys', apiKeysRouter);
+router.use('/settings', settingsRouter);
 
 export default router;

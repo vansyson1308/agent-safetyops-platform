@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
+import { parsePagination } from '../lib/pagination.ts';
 import { analyzeRunRisk, isGeminiConfigured } from '../services/geminiService.ts';
 import { finishRun, recordStep, RunServiceError } from '../services/runService.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
@@ -11,15 +12,20 @@ const router = Router();
 // List all runs
 router.get('/', async (req, res) => {
   try {
+    const page = parsePagination(req.query);
     const runs = await prisma.run.findMany({
       include: {
         agent: { select: { name: true } },
         createdBy: { select: { name: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
+      ...page,
     });
     res.json(runs);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid pagination', details: error.issues });
+    }
     res.status(500).json({ error: 'Failed to fetch runs' });
   }
 });

@@ -29,14 +29,14 @@ The app will be available at `http://localhost:3000`.
 ```
 src/
   routes/          # Express API route handlers
-  services/        # Business logic (policy engine, Gemini AI, audit)
+  services/        # Business logic (policy engine, runs, browser sessions, Gemini AI, audit)
   middleware/      # Auth middleware
   pages/           # React page components
   components/      # Reusable React components
   types/           # Shared TypeScript interfaces
-  lib/             # Utility functions
+  lib/             # Shared helpers (API client, Prisma client, permissions)
 prisma/            # Database schema and seeds
-packages/sdk/      # TypeScript SDK for agent integration
+tests/             # Vitest unit and API tests (run against a throwaway SQLite database)
 ```
 
 ## Making Changes
@@ -50,7 +50,6 @@ packages/sdk/      # TypeScript SDK for agent integration
 
 ## Code Style
 
-- TypeScript strict mode
 - Zod validation on all API inputs
 - Audit events for all mutations
 - Reuse shared components (`RiskScoreBar`, `StatusBadge`)

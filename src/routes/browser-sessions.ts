@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
+import { parsePagination } from '../lib/pagination.ts';
 import { BrowserSessionError, recordBrowserAction } from '../services/browserSessionService.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 import { requirePermission } from '../middleware/auth.ts';
@@ -10,12 +11,17 @@ const router = Router();
 // List all sessions
 router.get('/', async (req, res) => {
   try {
+    const page = parsePagination(req.query);
     const sessions = await prisma.browserSession.findMany({
       include: { agent: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
+      ...page,
     });
     res.json(sessions);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid pagination', details: error.issues });
+    }
     res.status(500).json({ error: 'Failed to fetch browser sessions' });
   }
 });

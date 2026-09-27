@@ -1,12 +1,18 @@
+import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Webhook, Shield, Plus } from "lucide-react"
+import { Shield } from "lucide-react"
 import ApiKeysCard from "@/components/ApiKeysCard"
+import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
 export default function Settings() {
   const { can } = useAuth()
+
+  const { data: integrations, isLoading } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: () => api<{ gemini: boolean }>("/settings/integrations"),
+  })
 
   return (
     <div className="space-y-6">
@@ -26,47 +32,20 @@ export default function Settings() {
           <div className="flex justify-between items-center p-4 border rounded-md">
             <div>
               <h4 className="font-medium">Google Gemini API</h4>
-              <p className="text-sm text-slate-500">Used for risk scoring and policy explanations.</p>
+              <p className="text-sm text-slate-500">
+                Used for run risk analysis and browser action risk scoring. Set <code>GEMINI_API_KEY</code> on the server to enable it.
+              </p>
             </div>
-            <Badge variant="default" className="bg-emerald-100 text-emerald-800">Configured</Badge>
-          </div>
-          <div className="flex justify-between items-center p-4 border rounded-md">
-            <div>
-              <h4 className="font-medium">Anthropic API</h4>
-              <p className="text-sm text-slate-500">Required for Claude-based agents.</p>
-            </div>
-            <Badge variant="secondary">Not Configured</Badge>
-          </div>
-          <div className="flex justify-between items-center p-4 border rounded-md">
-            <div>
-              <h4 className="font-medium">OpenAI API</h4>
-              <p className="text-sm text-slate-500">Required for GPT-based agents.</p>
-            </div>
-            <Badge variant="secondary">Not Configured</Badge>
+            {isLoading ? null : integrations?.gemini ? (
+              <Badge variant="default" className="bg-emerald-100 text-emerald-800">Configured</Badge>
+            ) : (
+              <Badge variant="secondary">Not Configured</Badge>
+            )}
           </div>
         </CardContent>
       </Card>
 
       {can('manage') && <ApiKeysCard />}
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-2">
-              <Webhook className="w-5 h-5" />
-              <span>Webhooks</span>
-            </CardTitle>
-            <Button size="sm" variant="outline">
-              <Plus className="w-4 h-4 mr-2" /> Add Webhook
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-slate-500 text-center py-6">
-            No webhooks configured. Add a webhook to receive real-time notifications when agents trigger security events.
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
