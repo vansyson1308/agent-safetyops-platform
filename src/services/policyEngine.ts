@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import type { PolicyDecision } from '../types/index.ts';
 
-const prisma = new PrismaClient();
 
 interface EvaluateStepInput {
   actionType: string;

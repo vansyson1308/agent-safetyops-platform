@@ -1,19 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
-import apiRouter from './src/routes/index.ts';
+import { createApp } from './src/app.ts';
 
-const app = express();
+const app = createApp();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-app.use(cors());
-app.use(express.json());
-
-// API Routes
-app.use('/api', apiRouter);
-
-// Vite middleware for development
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

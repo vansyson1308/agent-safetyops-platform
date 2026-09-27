@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { writeAuditEvent } from '../services/auditService.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // List all approvals
 router.get('/', async (req, res) => {

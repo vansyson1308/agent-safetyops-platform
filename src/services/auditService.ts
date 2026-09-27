@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 
-const prisma = new PrismaClient();
 
 export type AuditEventType =
   | 'agent_created' | 'agent_updated' | 'agent_deleted'

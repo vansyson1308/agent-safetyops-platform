@@ -1,12 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { generateToken } from '../middleware/auth.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const registerSchema = z.object({
   email: z.string().email(),

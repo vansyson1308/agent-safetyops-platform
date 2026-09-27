@@ -1,12 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { evaluateStep } from '../services/policyEngine.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // SDK API Key authentication middleware
 async function requireApiKey(req: Request, res: Response, next: NextFunction) {

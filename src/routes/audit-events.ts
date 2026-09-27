@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // List audit events with optional filtering
 router.get('/', async (req, res) => {

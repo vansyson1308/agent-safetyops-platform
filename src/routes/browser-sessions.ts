@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
 import { explainBrowserActionRisk } from '../services/geminiService.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // List all sessions
 router.get('/', async (req, res) => {
