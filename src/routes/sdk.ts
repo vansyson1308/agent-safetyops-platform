@@ -104,7 +104,7 @@ router.post('/runs/:id/steps', async (req, res) => {
       actionName: parsed.actionName,
       actionInput: parsed.actionInput as Record<string, unknown>,
       agentId: run.agentId,
-      currentStepCount: sequence,
+      stepNumber: sequence,
     });
 
     const step = await prisma.runStep.create({

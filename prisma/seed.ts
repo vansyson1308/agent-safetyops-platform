@@ -79,8 +79,9 @@ async function main() {
     data: {
       name: 'Strict Financial Controls',
       description: 'Requires approval for any transaction over $50.',
-      scope: 'global',
-      allowedTools: JSON.stringify(['read_balance', 'issue_refund', 'view_transactions']),
+      scope: 'agent',
+      agentId: agent1.id,
+      allowedTools: JSON.stringify(['read_balance', 'issue_refund', 'view_transactions', 'lookup_order']),
       blockedTools: JSON.stringify(['wire_transfer', 'delete_account', 'modify_credit_limit']),
       blockedDomains: JSON.stringify(['competitor.com', 'malicious.org']),
       allowedDomains: JSON.stringify(['*']),

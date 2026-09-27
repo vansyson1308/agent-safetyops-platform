@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { Policy } from "@/types"
+import type { Agent, Policy } from "@/types"
 import { api } from "@/lib/api"
 
 interface PolicyDialogProps {
@@ -21,7 +21,10 @@ export default function PolicyDialog({ open, onOpenChange, policy }: PolicyDialo
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scope, setScope] = useState<string>("global");
+  const [agentId, setAgentId] = useState("");
+  const [allowedTools, setAllowedTools] = useState("");
   const [blockedTools, setBlockedTools] = useState("");
+  const [allowedDomains, setAllowedDomains] = useState("");
   const [blockedDomains, setBlockedDomains] = useState("");
   const [restrictedActions, setRestrictedActions] = useState("");
   const [maxSpend, setMaxSpend] = useState("");
@@ -33,17 +36,30 @@ export default function PolicyDialog({ open, onOpenChange, policy }: PolicyDialo
       setName(policy.name);
       setDescription(policy.description || "");
       setScope(policy.scope);
+      setAgentId(policy.agentId || "");
+      setAllowedTools(JSON.parse(policy.allowedTools || "[]").join(", "));
       setBlockedTools(JSON.parse(policy.blockedTools || "[]").join(", "));
+      setAllowedDomains(JSON.parse(policy.allowedDomains || "[]").join(", "));
       setBlockedDomains(JSON.parse(policy.blockedDomains || "[]").join(", "));
       setRestrictedActions(JSON.parse(policy.restrictedActions || "[]").join(", "));
       setMaxSpend(policy.maxSpend?.toString() || "");
       setMaxStepsPerRun(policy.maxStepsPerRun?.toString() || "");
       setSeverityThreshold(policy.severityThreshold?.toString() || "50");
     } else {
-      setName(""); setDescription(""); setScope("global"); setBlockedTools("");
-      setBlockedDomains(""); setRestrictedActions(""); setMaxSpend(""); setMaxStepsPerRun(""); setSeverityThreshold("50");
+      setName(""); setDescription(""); setScope("global"); setAgentId(""); setAllowedTools(""); setBlockedTools("");
+      setAllowedDomains(""); setBlockedDomains(""); setRestrictedActions(""); setMaxSpend(""); setMaxStepsPerRun(""); setSeverityThreshold("50");
     }
   }, [policy, open]);
+
+  const { data: agents } = useQuery({
+    queryKey: ["agents"],
+    queryFn: () => api<Agent[]>("/agents"),
+    enabled: open,
+  });
+
+  const splitList = (value: string) => value.split(",").map(s => s.trim()).filter(Boolean);
+  // Clearing a field while editing must clear it on the server too.
+  const empty = isEdit ? null : undefined;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -51,11 +67,14 @@ export default function PolicyDialog({ open, onOpenChange, policy }: PolicyDialo
         name,
         description: description || undefined,
         scope,
-        blockedTools: blockedTools.split(",").map(s => s.trim()).filter(Boolean),
-        blockedDomains: blockedDomains.split(",").map(s => s.trim()).filter(Boolean),
-        restrictedActions: restrictedActions.split(",").map(s => s.trim()).filter(Boolean),
-        maxSpend: maxSpend ? parseFloat(maxSpend) : undefined,
-        maxStepsPerRun: maxStepsPerRun ? parseInt(maxStepsPerRun) : undefined,
+        agentId: scope === "agent" ? agentId : empty,
+        allowedTools: splitList(allowedTools),
+        blockedTools: splitList(blockedTools),
+        allowedDomains: splitList(allowedDomains),
+        blockedDomains: splitList(blockedDomains),
+        restrictedActions: splitList(restrictedActions),
+        maxSpend: maxSpend ? parseFloat(maxSpend) : empty,
+        maxStepsPerRun: maxStepsPerRun ? parseInt(maxStepsPerRun) : empty,
         severityThreshold: parseInt(severityThreshold),
       };
       return isEdit
@@ -95,12 +114,33 @@ export default function PolicyDialog({ open, onOpenChange, policy }: PolicyDialo
               </SelectContent>
             </Select>
           </div>
+          {scope === "agent" && (
+            <div className="space-y-2">
+              <Label>Agent</Label>
+              <Select value={agentId} onValueChange={setAgentId} required>
+                <SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger>
+                <SelectContent>
+                  {agents?.map(agent => (
+                    <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="allowedTools">Allowed Tools (comma-separated, empty = any)</Label>
+            <Input id="allowedTools" value={allowedTools} onChange={e => setAllowedTools(e.target.value)} placeholder="read_balance, view_transactions" />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="blockedTools">Blocked Tools (comma-separated)</Label>
             <Input id="blockedTools" value={blockedTools} onChange={e => setBlockedTools(e.target.value)} placeholder="wire_transfer, delete_account" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="blockedDomains">Blocked Domains (comma-separated)</Label>
+            <Label htmlFor="allowedDomains">Allowed Domains (comma-separated, empty = any)</Label>
+            <Input id="allowedDomains" value={allowedDomains} onChange={e => setAllowedDomains(e.target.value)} placeholder="example.com, *.partner.io" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="blockedDomains">Blocked Domains (comma-separated, includes subdomains)</Label>
             <Input id="blockedDomains" value={blockedDomains} onChange={e => setBlockedDomains(e.target.value)} placeholder="malicious.org, competitor.com" />
           </div>
           <div className="space-y-2">
@@ -125,7 +165,7 @@ export default function PolicyDialog({ open, onOpenChange, policy }: PolicyDialo
       </DialogContent>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button form="policy-form" type="submit" disabled={mutation.isPending}>
+        <Button form="policy-form" type="submit" disabled={mutation.isPending || (scope === "agent" && !agentId)}>
           {mutation.isPending ? "Saving..." : isEdit ? "Update" : "Create"}
         </Button>
       </DialogFooter>

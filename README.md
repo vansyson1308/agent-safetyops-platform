@@ -118,11 +118,13 @@ const status = await fetch(`/api/v1/sdk/runs/${runId}/decision`, {
 
 ### Policy Engine
 Define deterministic security rules that are evaluated before every agent action:
-- **Blocked Tools** - Prevent agents from using dangerous tools (e.g., `wire_transfer`, `delete_account`)
-- **Domain Restrictions** - Block access to unauthorized domains
-- **Spend Limits** - Cap financial transactions per run
-- **Step Limits** - Prevent infinite loops
-- **Custom Rules** - JSON-based condition matching with configurable severity
+- **Allowed / Blocked Tools** - Restrict tool calls to an allow-list, or block dangerous tools (e.g., `wire_transfer`, `delete_account`). An empty allow-list (or `*`) allows any tool
+- **Domain Restrictions** - Hostnames are extracted from the step input (URLs, bare domains, email addresses; percent-encoding is decoded) and matched per domain: blocking `x.com` covers `api.x.com` but not `dropbox.com`. Allowed domains are checked against URL hosts
+- **Restricted Actions** - Pause the run for human approval
+- **Step Limits** - Cap the number of steps per run
+- **Custom Rules** - Match on `actionType`, `actionName` or `actionNamePattern` (regex) and `block` or `require_approval`
+
+Policies apply globally or to one agent. The engine fails closed: a policy or rule it cannot parse blocks the step until it is fixed.
 
 ### Approval Workflow
 When a policy violation is detected:
