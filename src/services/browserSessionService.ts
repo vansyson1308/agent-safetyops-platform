@@ -62,7 +62,7 @@ export async function recordBrowserAction(input: BrowserActionInput, actorId: st
   const riskScore = Math.max(policy.riskScore, ai.risk?.riskScore ?? 0);
   const held = classification === 'blocked' || classification === 'requires_approval';
   const explanation = [
-    policy.violations.length > 0 ? policy.reason : null,
+    policy.violations.length > 0 ? `${policy.reason}.` : null,
     ai.risk?.explanation ?? ai.note,
   ].filter(Boolean).join(' ');
   const violations = [...policy.violations, ...(ai.risk?.policyViolations ?? [])];
