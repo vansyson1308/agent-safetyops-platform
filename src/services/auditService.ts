@@ -1,17 +1,15 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 
-const prisma = new PrismaClient();
 
 export type AuditEventType =
   | 'agent_created' | 'agent_updated' | 'agent_deleted'
   | 'policy_created' | 'policy_updated' | 'policy_deleted'
-  | 'run_started' | 'run_completed' | 'run_failed' | 'run_blocked'
+  | 'run_started' | 'run_completed' | 'run_failed' | 'run_blocked' | 'run_updated'
   | 'step_blocked' | 'step_flagged'
   | 'approval_requested' | 'approval_granted' | 'approval_denied'
   | 'incident_created' | 'incident_updated'
   | 'browser_session_created' | 'browser_action_blocked'
   | 'api_key_created' | 'api_key_deleted'
-  | 'webhook_created' | 'webhook_deleted'
   | 'user_login' | 'user_registered';
 
 export async function writeAuditEvent(params: {

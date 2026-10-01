@@ -1,23 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import apiRouter from './src/routes/index.ts';
+import { createApp } from './src/app.ts';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
+const app = createApp();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-app.use(cors());
-app.use(express.json());
-
-// API Routes
-app.use('/api', apiRouter);
-
-// Vite middleware for development
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
@@ -27,7 +15,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, 'dist');
+    // Resolved from the working directory: the server is bundled to CommonJS
+    // (dist/server.cjs), where import.meta.url is unavailable.
+    const distPath = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
@@ -39,4 +29,7 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

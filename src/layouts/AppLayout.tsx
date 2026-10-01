@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router-dom"
-import { Shield, LayoutDashboard, Bot, FileText, Activity, CheckCircle, AlertTriangle, Settings, Globe, ScrollText } from "lucide-react"
+import { Shield, LayoutDashboard, Bot, FileText, Activity, CheckCircle, AlertTriangle, Settings, Globe, ScrollText, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth"
 
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -16,6 +17,9 @@ const navItems = [
 
 export default function AppLayout() {
   const location = useLocation()
+  const { user, signOut } = useAuth()
+  const displayName = user?.name || user?.email || ""
+  const initials = displayName.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join("")
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -49,12 +53,21 @@ export default function AppLayout() {
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center">
             <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-medium text-xs">
-              SA
+              {initials}
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-white">Security Admin</p>
-              <p className="text-xs text-slate-400">admin@safetyops.ai</p>
+            <div className="ml-3 min-w-0 flex-1">
+              <p className="text-sm font-medium text-white truncate">{displayName}</p>
+              <p className="text-xs text-slate-400 capitalize">{user?.role}</p>
             </div>
+            <button
+              type="button"
+              onClick={signOut}
+              className="p-2 rounded-md hover:bg-slate-800 hover:text-white"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>

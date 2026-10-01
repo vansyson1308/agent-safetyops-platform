@@ -7,24 +7,25 @@ import { Button } from "@/components/ui/button"
 import { Plus, FileText, Trash2 } from "lucide-react"
 import PolicyDialog from "@/components/dialogs/PolicyDialog"
 import type { Policy } from "@/types"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 
 export default function Policies() {
   const queryClient = useQueryClient()
+  const { can } = useAuth()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editPolicy, setEditPolicy] = useState<Policy | null>(null)
 
   const { data: policies, isLoading } = useQuery({
     queryKey: ['policies'],
     queryFn: async () => {
-      const res = await fetch('/api/policies')
-      return res.json() as Promise<Policy[]>
+      return api<Policy[]>('/policies')
     }
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/policies/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete policy')
+      await api(`/policies/${id}`, { method: 'DELETE' })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['policies'] }),
   })
@@ -41,9 +42,11 @@ export default function Policies() {
           <h2 className="text-2xl font-bold tracking-tight">Security Policies</h2>
           <p className="text-muted-foreground">Define and enforce rules for agent behavior.</p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Create Policy
-        </Button>
+        {can('manage') && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" /> Create Policy
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -92,10 +95,12 @@ export default function Policies() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right space-x-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleEdit(policy)}>Edit</Button>
-                  <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => deleteMutation.mutate(policy.id)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  {can('manage') && (<>
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(policy)}>Edit</Button>
+                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => deleteMutation.mutate(policy.id)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </>)}
                 </TableCell>
               </TableRow>
             ))}

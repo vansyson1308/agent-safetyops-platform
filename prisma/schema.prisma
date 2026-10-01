@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -24,13 +24,6 @@ model User {
   incidentReports IncidentReport[]
   browserSessions BrowserSession[]
   apiKeys         ApiKey[]
-}
-
-model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Agent {
@@ -128,13 +121,20 @@ model RunStep {
   policyViolations String? // JSON array of policy IDs
   
   createdAt     DateTime @default(now())
+
+  @@unique([runId, sequence])
 }
 
+// Targets either a run step (runId + stepId) or a browser action
+// (sessionId + browserActionId).
 model ApprovalRequest {
   id            String   @id @default(uuid())
-  runId         String
-  run           Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
-  stepId        String?  // Optional, if tied to a specific step
+  runId         String?
+  run           Run?     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stepId        String?
+  sessionId     String?
+  session       BrowserSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  browserActionId String?
   status        String   @default("pending") // pending, approved, denied, modified
   reason        String
   proposedAction String  // JSON
@@ -178,7 +178,7 @@ model IncidentReport {
 model BrowserSession {
   id            String   @id @default(uuid())
   url           String
-  status        String   @default("active") // active, completed, failed, blocked
+  status        String   @default("active") // active, paused, blocked, completed, failed
   riskScore     Int?
   summary       String?
   
@@ -193,6 +193,7 @@ model BrowserSession {
 
   actions       BrowserAction[]
   artifacts     BrowserArtifact[]
+  approvals     ApprovalRequest[]
 }
 
 model BrowserAction {
@@ -210,6 +211,8 @@ model BrowserAction {
   explanation   String?  // Gemini-powered risk explanation
   
   createdAt     DateTime @default(now())
+
+  @@unique([sessionId, sequence])
 }
 
 model BrowserArtifact {
@@ -228,21 +231,11 @@ model ApiKey {
   name        String
   keyHash     String    @unique
   prefix      String    // First 8 chars for display: "sk-abc123..."
-  agentId     String?
-  agent       Agent?    @relation(fields: [agentId], references: [id])
+  agentId     String    // Keys act for exactly one agent
+  agent       Agent     @relation(fields: [agentId], references: [id])
   createdById String
   createdBy   User      @relation(fields: [createdById], references: [id])
   lastUsedAt  DateTime?
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
-}
-
-model Webhook {
-  id        String   @id @default(uuid())
-  url       String
-  events    String   // JSON array of event types
-  secret    String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

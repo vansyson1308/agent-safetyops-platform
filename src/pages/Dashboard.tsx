@@ -3,21 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Activity, ShieldAlert, CheckCircle, Bot } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { DashboardStats } from "@/types"
+import { api } from "@/lib/api"
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const res = await fetch('/api/dashboard/stats')
-      return res.json() as Promise<DashboardStats>
+      return api<DashboardStats>('/dashboard/stats')
     }
   })
 
   const { data: chartData } = useQuery({
     queryKey: ['dashboard-chart'],
     queryFn: async () => {
-      const res = await fetch('/api/dashboard/chart-data?days=7')
-      return res.json()
+      return api('/dashboard/chart-data?days=7')
     }
   })
 

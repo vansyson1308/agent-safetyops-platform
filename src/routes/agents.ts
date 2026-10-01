@@ -1,20 +1,26 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
+import { parsePagination } from '../lib/pagination.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // List all agents
 router.get('/', async (req, res) => {
   try {
+    const page = parsePagination(req.query);
     const agents = await prisma.agent.findMany({
       include: { createdBy: { select: { name: true, email: true } } },
       orderBy: { createdAt: 'desc' },
+      ...page,
     });
     res.json(agents);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid pagination', details: error.issues });
+    }
     res.status(500).json({ error: 'Failed to fetch agents' });
   }
 });
@@ -49,7 +55,7 @@ const createAgentSchema = z.object({
 });
 
 // Create agent
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = createAgentSchema.parse(req.body);
     const agent = await prisma.agent.create({
@@ -96,7 +102,7 @@ const updateAgentSchema = z.object({
 });
 
 // Update agent
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = updateAgentSchema.parse(req.body);
     const data: Record<string, unknown> = { ...parsed };
@@ -126,7 +132,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete agent (soft delete)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('manage'), async (req, res) => {
   try {
     const agent = await prisma.agent.update({
       where: { id: req.params.id },

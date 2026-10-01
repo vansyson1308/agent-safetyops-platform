@@ -1,12 +1,27 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { generateToken } from '../middleware/auth.ts';
+import { generateToken, requireAuth } from '../middleware/auth.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
+
+// Open sign-up is off unless ALLOW_REGISTRATION=true. The first account on
+// an empty instance can always register and becomes its owner.
+function registrationOpen() {
+  return process.env.ALLOW_REGISTRATION === 'true';
+}
+
+// Tells the login page whether to offer first-time setup or sign-up.
+router.get('/status', async (req, res) => {
+  try {
+    const userCount = await prisma.user.count();
+    res.json({ needsSetup: userCount === 0, registrationOpen: registrationOpen() });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch auth status' });
+  }
+});
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -18,6 +33,11 @@ router.post('/register', async (req, res) => {
   try {
     const parsed = registerSchema.parse(req.body);
 
+    const isFirstUser = (await prisma.user.count()) === 0;
+    if (!isFirstUser && !registrationOpen()) {
+      return res.status(403).json({ error: 'Registration is disabled. Ask an administrator for an account.' });
+    }
+
     const existing = await prisma.user.findUnique({ where: { email: parsed.email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
@@ -27,7 +47,7 @@ router.post('/register', async (req, res) => {
         email: parsed.email,
         name: parsed.name,
         passwordHash,
-        role: 'viewer',
+        role: isFirstUser ? 'owner' : 'viewer',
       },
     });
 
@@ -36,10 +56,10 @@ router.post('/register', async (req, res) => {
       resourceType: 'user',
       resourceId: user.id,
       actorId: user.id,
-      details: { email: parsed.email },
+      details: { email: parsed.email, role: user.role },
     });
 
-    const token = generateToken(user.id, user.role, user.email);
+    const token = generateToken(user.id);
     res.status(201).json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -78,7 +98,7 @@ router.post('/login', async (req, res) => {
       actorId: user.id,
     });
 
-    const token = generateToken(user.id, user.role, user.email);
+    const token = generateToken(user.id);
     res.json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -91,11 +111,10 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.get('/me', async (req, res) => {
-  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
+      where: { id: req.user!.id },
       select: { id: true, email: true, name: true, role: true, createdAt: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });

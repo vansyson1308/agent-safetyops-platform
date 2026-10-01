@@ -1,20 +1,26 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
+import { parsePagination } from '../lib/pagination.ts';
 import { writeAuditEvent } from '../services/auditService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // List all policies
 router.get('/', async (req, res) => {
   try {
+    const page = parsePagination(req.query);
     const policies = await prisma.policy.findMany({
       include: { createdBy: { select: { name: true, email: true } }, rules: true },
       orderBy: { createdAt: 'desc' },
+      ...page,
     });
     res.json(policies);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid pagination', details: error.issues });
+    }
     res.status(500).json({ error: 'Failed to fetch policies' });
   }
 });
@@ -33,6 +39,15 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Agent-scoped policies need an existing agent; global ones have none.
+async function resolvePolicyAgent(scope: string, agentId: string | null | undefined) {
+  if (scope !== 'agent') return { agentId: null };
+  if (!agentId) return { error: 'agentId is required for agent-scoped policies' };
+  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true } });
+  if (!agent) return { error: 'Agent not found' };
+  return { agentId };
+}
+
 const createPolicySchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
@@ -49,9 +64,12 @@ const createPolicySchema = z.object({
 });
 
 // Create policy
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = createPolicySchema.parse(req.body);
+    const target = await resolvePolicyAgent(parsed.scope, parsed.agentId);
+    if (target.error) return res.status(400).json({ error: target.error });
+
     const policy = await prisma.policy.create({
       data: {
         name: parsed.name,
@@ -65,7 +83,7 @@ router.post('/', async (req, res) => {
         maxSpend: parsed.maxSpend,
         maxStepsPerRun: parsed.maxStepsPerRun,
         severityThreshold: parsed.severityThreshold,
-        agentId: parsed.agentId,
+        agentId: target.agentId,
         createdById: req.user!.id,
       },
     });
@@ -103,10 +121,19 @@ const updatePolicySchema = z.object({
 });
 
 // Update policy
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('manage'), async (req, res) => {
   try {
     const parsed = updatePolicySchema.parse(req.body);
-    const data: Record<string, unknown> = {};
+    const existing = await prisma.policy.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Policy not found' });
+
+    const target = await resolvePolicyAgent(
+      parsed.scope ?? existing.scope,
+      parsed.agentId !== undefined ? parsed.agentId : existing.agentId,
+    );
+    if (target.error) return res.status(400).json({ error: target.error });
+
+    const data: Record<string, unknown> = { agentId: target.agentId };
     if (parsed.name !== undefined) data.name = parsed.name;
     if (parsed.description !== undefined) data.description = parsed.description;
     if (parsed.scope !== undefined) data.scope = parsed.scope;
@@ -118,7 +145,6 @@ router.put('/:id', async (req, res) => {
     if (parsed.maxSpend !== undefined) data.maxSpend = parsed.maxSpend;
     if (parsed.maxStepsPerRun !== undefined) data.maxStepsPerRun = parsed.maxStepsPerRun;
     if (parsed.severityThreshold !== undefined) data.severityThreshold = parsed.severityThreshold;
-    if (parsed.agentId !== undefined) data.agentId = parsed.agentId;
 
     const policy = await prisma.policy.update({
       where: { id: req.params.id },
@@ -143,7 +169,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete policy
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('manage'), async (req, res) => {
   try {
     await prisma.policy.delete({ where: { id: req.params.id } });
 

@@ -16,7 +16,7 @@ export type StepActionType = 'tool_call' | 'reasoning' | 'observation';
 export type StepClassification = 'safe' | 'warning' | 'blocked' | 'requires_approval';
 export type ApprovalStatus = 'pending' | 'approved' | 'denied' | 'modified';
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type BrowserSessionStatus = 'active' | 'completed' | 'failed' | 'blocked';
+export type BrowserSessionStatus = 'active' | 'paused' | 'blocked' | 'completed' | 'failed';
 export type BrowserActionType = 'navigate' | 'click' | 'type' | 'extract_text' | 'screenshot';
 export type ArtifactType = 'screenshot' | 'extracted_text' | 'downloaded_file';
 
@@ -114,11 +114,15 @@ export interface RunStep {
   createdAt: string;
 }
 
+// Targets a run step (runId) or a browser action (sessionId).
 export interface ApprovalRequest {
   id: string;
-  runId: string;
-  run?: Run;
+  runId: string | null;
+  run?: Pick<Run, 'task'> & { agent?: Pick<Agent, 'name'> } | null;
   stepId: string | null;
+  sessionId: string | null;
+  session?: Pick<BrowserSession, 'url'> & { agent?: Pick<Agent, 'name'> | null } | null;
+  browserActionId: string | null;
   status: ApprovalStatus;
   reason: string;
   proposedAction: string; // JSON
@@ -198,25 +202,12 @@ export interface ApiKey {
   id: string;
   name: string;
   prefix: string;
-  agentId: string | null;
-  agent?: Agent | null;
-  createdById: string;
-  createdBy?: User;
+  agentId: string;
+  agent?: Pick<Agent, 'name'>;
+  createdBy?: Pick<User, 'name' | 'email'>;
   lastUsedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
-}
-
-// --- Webhook (new model for event dispatch) ---
-
-export interface Webhook {
-  id: string;
-  url: string;
-  events: string; // JSON array of event types
-  secret: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
 // --- API Response Types ---

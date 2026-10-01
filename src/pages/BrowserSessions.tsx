@@ -9,31 +9,35 @@ import { Input } from "@/components/ui/input"
 import { Globe, ShieldAlert, Activity, Plus } from "lucide-react"
 import RiskScoreBar from "@/components/RiskScoreBar"
 import StatusBadge from "@/components/StatusBadge"
-import type { BrowserSession } from "@/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { Agent, BrowserSession } from "@/types"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 
 export default function BrowserSessions() {
   const [newUrl, setNewUrl] = useState("")
+  const [agentId, setAgentId] = useState("")
   const queryClient = useQueryClient()
+  const { can } = useAuth()
   const navigate = useNavigate()
 
   const { data: sessions, isLoading, error } = useQuery({
     queryKey: ['browser-sessions'],
     queryFn: async () => {
-      const res = await fetch('/api/browser-sessions')
-      if (!res.ok) throw new Error('Failed to fetch browser sessions')
-      return res.json() as Promise<BrowserSession[]>
+      return api<BrowserSession[]>('/browser-sessions')
     }
+  })
+
+  const { data: agents } = useQuery({
+    queryKey: ['agents'],
+    queryFn: () => api<Agent[]>('/agents'),
+    enabled: can('operate'),
   })
 
   const createMutation = useMutation({
     mutationFn: async (url: string) => {
-      const res = await fetch('/api/browser-sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      })
-      if (!res.ok) throw new Error('Failed to create session')
-      return res.json()
+      // The agent's policies apply to the session's actions.
+      return api('/browser-sessions', { method: 'POST', body: { url, agentId: agentId || undefined } })
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['browser-sessions'] })
@@ -53,13 +57,23 @@ export default function BrowserSessions() {
           <h2 className="text-2xl font-bold tracking-tight">Browser Sandbox</h2>
           <p className="text-muted-foreground">Monitor and replay agent browser sessions.</p>
         </div>
-        <form onSubmit={handleCreate} className="flex space-x-2">
-          <Input type="url" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required className="w-64" />
-          <Button type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? <Activity className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-            New Session
-          </Button>
-        </form>
+        {can('operate') && (
+          <form onSubmit={handleCreate} className="flex space-x-2">
+            <Select value={agentId} onValueChange={setAgentId}>
+              <SelectTrigger className="w-48"><SelectValue placeholder="Agent (optional)" /></SelectTrigger>
+              <SelectContent>
+                {agents?.filter(agent => agent.status === 'active').map(agent => (
+                  <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="url" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required className="w-64" />
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? <Activity className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              New Session
+            </Button>
+          </form>
+        )}
       </div>
 
       <Card>

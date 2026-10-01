@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Agent } from "@/types"
+import { api } from "@/lib/api"
 
 interface RunDialogProps {
   open: boolean;
@@ -22,20 +23,13 @@ export default function RunDialog({ open, onOpenChange }: RunDialogProps) {
   const { data: agents } = useQuery({
     queryKey: ["agents"],
     queryFn: async () => {
-      const res = await fetch("/api/agents");
-      return res.json() as Promise<Agent[]>;
+      return api<Agent[]>("/agents");
     },
   });
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task, agentId }),
-      });
-      if (!res.ok) throw new Error("Failed to create run");
-      return res.json();
+      return api("/runs", { method: "POST", body: { task, agentId } });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["runs"] });

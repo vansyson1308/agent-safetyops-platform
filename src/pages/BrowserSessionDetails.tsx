@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Globe, MousePointerClick, Type, ScanText, Camera, ShieldAlert, Plus } from "lucide-react"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 
 export default function BrowserSessionDetails() {
   const { id } = useParams()
   const queryClient = useQueryClient()
+  const { can } = useAuth()
   
   const [actionType, setActionType] = useState("navigate")
   const [target, setTarget] = useState("")
@@ -19,21 +22,13 @@ export default function BrowserSessionDetails() {
   const { data: session, isLoading, error } = useQuery({
     queryKey: ['browser-session', id],
     queryFn: async () => {
-      const res = await fetch(`/api/browser-sessions/${id}`)
-      if (!res.ok) throw new Error('Failed to fetch session details')
-      return res.json()
+      return api(`/browser-sessions/${id}`)
     }
   })
 
   const actionMutation = useMutation({
     mutationFn: async (actionData: any) => {
-      const res = await fetch('/api/browser-sessions/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(actionData)
-      })
-      if (!res.ok) throw new Error('Failed to process action')
-      return res.json()
+      return api('/browser-sessions/action', { method: 'POST', body: actionData })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['browser-session', id] })
@@ -152,41 +147,50 @@ export default function BrowserSessionDetails() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Simulate Action</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleActionSubmit} className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-2 flex-1 min-w-[200px]">
-              <label className="text-sm font-medium">Action Type</label>
-              <Select value={actionType} onValueChange={setActionType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="navigate">Navigate</SelectItem>
-                  <SelectItem value="click">Click</SelectItem>
-                  <SelectItem value="type">Type</SelectItem>
-                  <SelectItem value="extract_text">Extract Text</SelectItem>
-                  <SelectItem value="screenshot">Screenshot</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 flex-1 min-w-[200px]">
-              <label className="text-sm font-medium">Target (Selector/URL)</label>
-              <Input value={target} onChange={e => setTarget(e.target.value)} placeholder="e.g. #login-btn" />
-            </div>
-            <div className="space-y-2 flex-1 min-w-[200px]">
-              <label className="text-sm font-medium">Value (Text to type)</label>
-              <Input value={value} onChange={e => setValue(e.target.value)} placeholder="e.g. mypassword" disabled={actionType !== 'type'} />
-            </div>
-            <Button type="submit" disabled={actionMutation.isPending}>
-              <Plus className="mr-2 h-4 w-4" /> Execute
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      {can('operate') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Simulate Action</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {session.status !== 'active' && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-3">
+                {session.status === 'paused' || session.status === 'blocked'
+                  ? <>This session is {session.status} until its pending request is decided on the <Link to="/approvals" className="underline">Approvals</Link> page.</>
+                  : <>This session is {session.status} and accepts no more actions.</>}
+              </p>
+            )}
+            <form onSubmit={handleActionSubmit} className="flex flex-wrap gap-4 items-end">
+              <div className="space-y-2 flex-1 min-w-[200px]">
+                <label className="text-sm font-medium">Action Type</label>
+                <Select value={actionType} onValueChange={setActionType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="navigate">Navigate</SelectItem>
+                    <SelectItem value="click">Click</SelectItem>
+                    <SelectItem value="type">Type</SelectItem>
+                    <SelectItem value="extract_text">Extract Text</SelectItem>
+                    <SelectItem value="screenshot">Screenshot</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 flex-1 min-w-[200px]">
+                <label className="text-sm font-medium">Target (Selector/URL)</label>
+                <Input value={target} onChange={e => setTarget(e.target.value)} placeholder="e.g. #login-btn" />
+              </div>
+              <div className="space-y-2 flex-1 min-w-[200px]">
+                <label className="text-sm font-medium">Value (Text to type)</label>
+                <Input value={value} onChange={e => setValue(e.target.value)} placeholder="e.g. mypassword" disabled={actionType !== 'type'} />
+              </div>
+              <Button type="submit" disabled={actionMutation.isPending || session.status !== 'active'}>
+                <Plus className="mr-2 h-4 w-4" /> Execute
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

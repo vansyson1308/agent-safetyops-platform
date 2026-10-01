@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Agent } from "@/types"
+import { api } from "@/lib/api"
 
 interface AgentDialogProps {
   open: boolean;
@@ -54,11 +55,9 @@ export default function AgentDialog({ open, onOpenChange, agent }: AgentDialogPr
         actionBudget: actionBudget ? parseInt(actionBudget) : undefined,
         approvalMode,
       };
-      const url = isEdit ? `/api/agents/${agent.id}` : "/api/agents";
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error("Failed to save agent");
-      return res.json();
+      return isEdit
+        ? api(`/agents/${agent.id}`, { method: "PUT", body })
+        : api("/agents", { method: "POST", body });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents"] });

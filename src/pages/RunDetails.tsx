@@ -5,23 +5,24 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, RefreshCw, BrainCircuit, Wrench, ShieldAlert } from "lucide-react"
 import RiskScoreBar, { getRiskTextColor } from "@/components/RiskScoreBar"
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 
 export default function RunDetails() {
   const { id } = useParams()
   const queryClient = useQueryClient()
+  const { can } = useAuth()
 
   const { data: run, isLoading } = useQuery({
     queryKey: ['run', id],
     queryFn: async () => {
-      const res = await fetch(`/api/runs/${id}`)
-      return res.json()
+      return api(`/runs/${id}`)
     }
   })
 
   const analyzeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/runs/${id}/analyze`, { method: 'POST' })
-      return res.json()
+      return api(`/runs/${id}/analyze`, { method: 'POST' })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['run', id] }),
   })
@@ -67,7 +68,7 @@ export default function RunDetails() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle>Risk Analysis</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => analyzeMutation.mutate()} disabled={analyzeMutation.isPending}>
+            <Button variant="outline" size="sm" onClick={() => analyzeMutation.mutate()} disabled={!can('operate') || analyzeMutation.isPending}>
               <RefreshCw className={`w-3 h-3 mr-2 ${analyzeMutation.isPending ? 'animate-spin' : ''}`} />
               {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze'}
             </Button>

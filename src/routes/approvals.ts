@@ -1,25 +1,35 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.ts';
 import { z } from 'zod';
-import { writeAuditEvent } from '../services/auditService.ts';
+import { paginationSchema } from '../lib/pagination.ts';
+import { resolveApproval, RunServiceError } from '../services/runService.ts';
+import { requirePermission } from '../middleware/auth.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
-// List all approvals
+const listApprovalsSchema = paginationSchema.extend({
+  status: z.enum(['pending', 'approved', 'denied', 'modified']).optional(),
+});
+
+// List approvals, optionally by status
 router.get('/', async (req, res) => {
   try {
-    const { status } = req.query;
-    const where = status ? { status: status as string } : {};
+    const { status, limit, offset } = listApprovalsSchema.parse(req.query);
     const approvals = await prisma.approvalRequest.findMany({
-      where,
+      where: status ? { status } : {},
       include: {
         run: { select: { task: true, agent: { select: { name: true } } } },
+        session: { select: { url: true, agent: { select: { name: true } } } },
       },
       orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
     });
     res.json(approvals);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
     res.status(500).json({ error: 'Failed to fetch approvals' });
   }
 });
@@ -29,49 +39,17 @@ const updateApprovalSchema = z.object({
 });
 
 // Approve or deny
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('approve'), async (req, res) => {
   try {
     const parsed = updateApprovalSchema.parse(req.body);
-
-    const approval = await prisma.approvalRequest.findUnique({
-      where: { id: req.params.id },
-    });
-    if (!approval) return res.status(404).json({ error: 'Approval request not found' });
-    if (approval.status !== 'pending') return res.status(400).json({ error: 'Approval already processed' });
-
-    const updated = await prisma.approvalRequest.update({
-      where: { id: req.params.id },
-      data: {
-        status: parsed.status,
-        approverId: req.user!.id,
-      },
-    });
-
-    // Resume or fail the associated run
-    if (parsed.status === 'approved') {
-      await prisma.run.update({
-        where: { id: approval.runId },
-        data: { status: 'running' },
-      });
-    } else {
-      await prisma.run.update({
-        where: { id: approval.runId },
-        data: { status: 'failed' },
-      });
-    }
-
-    await writeAuditEvent({
-      eventType: parsed.status === 'approved' ? 'approval_granted' : 'approval_denied',
-      resourceType: 'approval_request',
-      resourceId: updated.id,
-      actorId: req.user!.id,
-      details: { runId: approval.runId, status: parsed.status },
-    });
-
-    res.json(updated);
+    const approval = await resolveApproval(req.params.id, parsed.status, req.user!.id);
+    res.json(approval);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.issues });
+    }
+    if (error instanceof RunServiceError) {
+      return res.status(error.status).json({ error: error.message });
     }
     res.status(500).json({ error: 'Failed to update approval' });
   }
